@@ -30,7 +30,23 @@ class Money {
 
   static num? _toNum(Object? value) {
     if (value is num) return value;
-    if (value is String) return num.tryParse(value.trim());
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+
+      final normalized = trimmed
+          .replaceAll(RegExp(r'[^0-9.\-+]'), '')
+          .replaceAll(RegExp(r'(?<=\d),(?=\d)'), '');
+
+      if (normalized.isEmpty ||
+          normalized == '.' ||
+          normalized == '-' ||
+          normalized == '+') {
+        return null;
+      }
+
+      return num.tryParse(normalized);
+    }
     return null;
   }
 }

@@ -1,0 +1,40 @@
+{
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_custom_target"
+		],
+		"files" : 
+		[
+			"flutter/ephemeral/.plugin_symlinks/webview_windows/windows/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 33,
+				"parent" : 0
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 10
+	},
+	"id" : "webview_windows_DEPENDENCIES_DOWNLOAD::@4eabb5beed6399285b2d",
+	"name" : "webview_windows_DEPENDENCIES_DOWNLOAD",
+	"paths" : 
+	{
+		"build" : "plugins/webview_windows",
+		"source" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows"
+	},
+	"sources" : [],
+	"type" : "UTILITY"
+}

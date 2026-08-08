@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_exception.dart';
 import '../../billing/data/billing_repository.dart';
 import '../domain/bill_filters.dart';
 import '../domain/bill_summary.dart';
@@ -44,8 +43,8 @@ class BillsController extends Notifier<BillsState> {
         loading: false,
         error: null,
       );
-    } on ApiException catch (e) {
-      state = state.copyWith(loading: false, error: e.message, rows: const []);
+    } catch (e) {
+      state = state.copyWith(loading: false, error: e.toString(), rows: const []);
     }
   }
 

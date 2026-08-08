@@ -43,6 +43,8 @@ class CartLine {
 
   String get skuDisplay => sku.isNotEmpty ? sku : (id.isNotEmpty ? id : '—');
 
+  String get mergeKey => '$id|$sku|$pricingType';
+
   bool get hasWholesaleConfig =>
       (wholesaleRatePaise != null && wholesaleRatePaise! > 0) &&
       (wholesaleMinQty != null && wholesaleMinQty! > 0);

@@ -39,6 +39,11 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
+      listTileTheme: const ListTileThemeData(
+        tileColor: AppColors.neutral0,
+        textColor: AppColors.neutral900,
+        iconColor: AppColors.neutral700,
+      ),
       inputDecorationTheme: _inputTheme(),
       elevatedButtonTheme: _primaryButtonTheme(),
       outlinedButtonTheme: _secondaryButtonTheme(),
@@ -87,6 +92,11 @@ class AppTheme {
         color: AppColors.neutral700,
         thickness: 1,
         space: 1,
+      ),
+      listTileTheme: const ListTileThemeData(
+        tileColor: AppColors.neutral800,
+        textColor: AppColors.neutral0,
+        iconColor: AppColors.neutral200,
       ),
       dialogTheme: const DialogThemeData(
         backgroundColor: AppColors.neutral800,
@@ -139,18 +149,15 @@ class AppTheme {
 
   static InputDecorationTheme _inputTheme() {
     OutlineInputBorder border(Color color) => OutlineInputBorder(
-          borderRadius: AppRadius.input,
-          borderSide: BorderSide(color: color),
-        );
+      borderRadius: AppRadius.input,
+      borderSide: BorderSide(color: color),
+    );
 
     return InputDecorationTheme(
       filled: true,
       fillColor: AppColors.neutral0,
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       enabledBorder: border(AppColors.neutral300),
       border: border(AppColors.neutral300),
       hoverColor: Colors.transparent,
@@ -158,10 +165,7 @@ class AppTheme {
       disabledBorder: border(AppColors.neutral200),
       errorBorder: border(AppColors.error500),
       focusedErrorBorder: border(AppColors.error500),
-      helperStyle: const TextStyle(
-        fontSize: 12,
-        color: AppColors.neutral500,
-      ),
+      helperStyle: const TextStyle(fontSize: 12, color: AppColors.neutral500),
     );
   }
 

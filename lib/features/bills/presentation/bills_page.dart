@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../app/module_scaffold.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../shared/widgets/app_card.dart';
 import '../../billing/domain/money.dart';
-import '../../billing/presentation/widgets/app_card.dart';
 import '../application/bills_controller.dart';
 import '../application/bills_state.dart';
 import '../domain/bill_filters.dart';
@@ -75,8 +75,6 @@ class _BillsPageState extends ConsumerState<BillsPage> {
       autofocus: true,
       onKeyEvent: _onKey,
       child: ModuleScaffold(
-        title: 'Bills',
-        description: 'View, reprint, and manage saved bills. Alt+C: Sales Desk.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -141,7 +139,7 @@ class _FiltersBar extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           SizedBox(
-            width: 220,
+            width: 180,
             height: AppSizing.controlHeight,
             child: TextField(
               controller: billIdController,
@@ -153,17 +151,22 @@ class _FiltersBar extends StatelessWidget {
             ),
           ),
           SizedBox(
-            width: 180,
+            width: 160,
             height: AppSizing.controlHeight,
             child: DropdownButtonFormField<String>(
               initialValue: paymentMode,
+              isExpanded: true,
               items: _paymentModeOptions
                   .map((m) => DropdownMenuItem(
                         value: m,
-                        child: Text(m.isEmpty ? 'All Payment Modes' : m),
+                        child: Text(m.isEmpty ? 'All Modes' : m),
                       ))
                   .toList(),
               onChanged: (v) => onPaymentModeChanged(v ?? ''),
+              decoration: const InputDecoration(
+                hintText: 'Payment',
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
             ),
           ),
           _DateField(

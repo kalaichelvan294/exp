@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/appearance.dart';
-import '../../../core/api/api_exception.dart';
 import '../../billing/domain/billing_enums.dart';
 import '../data/settings_repository.dart';
 import '../domain/app_settings.dart';
@@ -31,26 +30,110 @@ class SettingsController extends Notifier<SettingsState> {
         loaded: true,
         message: SettingsMessage.none,
       );
-    } on ApiException catch (e) {
+    } catch (e) {
       state = state.copyWith(
         loaded: true,
         message: SettingsMessage(
-            'Failed to load settings: ${e.message}',
-            SettingsMessageType.error),
+          'Failed to load settings: ${e.toString()}',
+          SettingsMessageType.error,
+        ),
       );
     }
   }
 
-  void _ok(String text) =>
-      state = state.copyWith(
-          message: SettingsMessage(text, SettingsMessageType.success));
+  void _ok(String text) => state = state.copyWith(
+    message: SettingsMessage(text, SettingsMessageType.success),
+  );
 
-  void _err(String text) =>
-      state = state.copyWith(
-          message: SettingsMessage(text, SettingsMessageType.error));
+  void _err(String text) => state = state.copyWith(
+    message: SettingsMessage(text, SettingsMessageType.error),
+  );
 
-  void clearMessage() =>
-      state = state.copyWith(message: SettingsMessage.none);
+  void clearMessage() => state = state.copyWith(message: SettingsMessage.none);
+
+  void showSuccess(String text) => _ok(text);
+
+  void showError(String text) => _err(text);
+
+  void previewStoreProfile({
+    required String storeName,
+    required String businessType,
+    required String storeAddress,
+    required String fssaiNumber,
+  }) {
+    state = state.copyWith(
+      settings: state.settings.copyWith(
+        storeName: storeName,
+        businessType: businessType,
+        storeAddress: storeAddress,
+        fssaiNumber: fssaiNumber,
+      ),
+    );
+  }
+
+  void previewPrintLanguage(String language) {
+    state = state.copyWith(
+      settings: state.settings.copyWith(
+        printLanguage: language == 'ta' ? 'ta' : 'en',
+      ),
+    );
+  }
+
+  void previewUpi({
+    required String upiId,
+    required String displayName,
+  }) {
+    state = state.copyWith(
+      settings: state.settings.copyWith(
+        upiId: upiId,
+        upiDisplayName: displayName,
+      ),
+    );
+  }
+
+  void previewPaymentModes(List<PaymentMode> modes) {
+    final normalized = modes.isEmpty
+        ? <PaymentMode>[...state.settings.billingPaymentModes]
+        : AppSettings.normalizePaymentModes(
+            modes.map((m) => m.wire).toList(),
+          );
+    state = state.copyWith(
+      settings: state.settings.copyWith(billingPaymentModes: normalized),
+    );
+  }
+
+  void previewAppearance({
+    required String uiSizeVariant,
+    required String themeMode,
+  }) {
+    final variant = AppSettings.normalizeUiSizeVariant(uiSizeVariant);
+    final mode = AppSettings.normalizeThemeMode(themeMode);
+    state = state.copyWith(
+      settings: state.settings.copyWith(
+        uiSizeVariant: variant,
+        themeMode: mode,
+      ),
+    );
+    ref
+        .read(appearanceControllerProvider.notifier)
+        .apply(themeMode: mode, uiSizeVariant: variant);
+  }
+
+  void previewInventoryControl(bool enabled) {
+    state = state.copyWith(invControlEnabled: enabled);
+  }
+
+  void previewItemConfig({
+    required bool wholesaleAutoApply,
+    required String itemImagesRootPath,
+  }) {
+    state = state.copyWith(
+      settings: state.settings.copyWith(
+        itemsWholesaleAutoApply: wholesaleAutoApply,
+        itemImagesRootPath: itemImagesRootPath.trim(),
+      ),
+    );
+  }
 
   Future<void> _save(
     Map<String, dynamic> patch,
@@ -62,8 +145,8 @@ class SettingsController extends Notifier<SettingsState> {
       await _repo.saveSettings(patch);
       state = state.copyWith(settings: updated);
       _ok(successText);
-    } on ApiException catch (e) {
-      _err('$failPrefix: ${e.message}');
+    } catch (e) {
+      _err('$failPrefix: ${e.toString()}');
     }
   }
 
@@ -108,7 +191,10 @@ class SettingsController extends Notifier<SettingsState> {
     );
   }
 
-  Future<void> saveUpi({required String upiId, required String displayName}) async {
+  Future<void> saveUpi({
+    required String upiId,
+    required String displayName,
+  }) async {
     final id = upiId.trim();
     final name = displayName.trim();
     await _save(
@@ -121,8 +207,9 @@ class SettingsController extends Notifier<SettingsState> {
 
   Future<void> savePaymentModes(List<PaymentMode> modes) async {
     if (modes.isEmpty) return _err('Select at least one payment mode.');
-    final normalized =
-        AppSettings.normalizePaymentModes(modes.map((m) => m.wire).toList());
+    final normalized = AppSettings.normalizePaymentModes(
+      modes.map((m) => m.wire).toList(),
+    );
     await _save(
       {'billingPaymentModes': normalized.map((m) => m.wire).toList()},
       state.settings.copyWith(billingPaymentModes: normalized),
@@ -140,15 +227,17 @@ class SettingsController extends Notifier<SettingsState> {
     try {
       await _repo.saveSettings({'uiSizeVariant': variant, 'themeMode': mode});
       state = state.copyWith(
-        settings:
-            state.settings.copyWith(uiSizeVariant: variant, themeMode: mode),
+        settings: state.settings.copyWith(
+          uiSizeVariant: variant,
+          themeMode: mode,
+        ),
       );
       ref
           .read(appearanceControllerProvider.notifier)
           .apply(themeMode: mode, uiSizeVariant: variant);
       _ok('Appearance settings saved successfully!');
-    } on ApiException catch (e) {
-      _err('Failed to save appearance settings: ${e.message}');
+    } catch (e) {
+      _err('Failed to save appearance settings: ${e.toString()}');
     }
   }
 
@@ -157,8 +246,8 @@ class SettingsController extends Notifier<SettingsState> {
       await _repo.saveInventorySettings(invControlEnabled: enabled);
       state = state.copyWith(invControlEnabled: enabled);
       _ok('Inventory settings saved successfully!');
-    } on ApiException catch (e) {
-      _err('Failed to save inventory settings: ${e.message}');
+    } catch (e) {
+      _err('Failed to save inventory settings: ${e.toString()}');
     }
   }
 
@@ -173,17 +262,22 @@ class SettingsController extends Notifier<SettingsState> {
     if (state.categories.contains(normalized)) {
       return _err('Category already exists.');
     }
+    final categories = [...state.categories, normalized];
     state = state.copyWith(
-      categories: [...state.categories, normalized],
+      categories: categories,
+      settings: state.settings.copyWith(itemCategories: categories),
       message: const SettingsMessage(
-          'Category added. Save configuration to apply.',
-          SettingsMessageType.success),
+        'Category added. Save configuration to apply.',
+        SettingsMessageType.success,
+      ),
     );
   }
 
   void removeCategory(String name) {
+    final categories = state.categories.where((c) => c != name).toList();
     state = state.copyWith(
-      categories: state.categories.where((c) => c != name).toList(),
+      categories: categories,
+      settings: state.settings.copyWith(itemCategories: categories),
     );
   }
 
@@ -193,17 +287,22 @@ class SettingsController extends Notifier<SettingsState> {
     if (state.brands.contains(normalized)) {
       return _err('Brand already exists.');
     }
+    final brands = [...state.brands, normalized];
     state = state.copyWith(
-      brands: [...state.brands, normalized],
+      brands: brands,
+      settings: state.settings.copyWith(itemBrands: brands),
       message: const SettingsMessage(
-          'Brand added. Save configuration to apply.',
-          SettingsMessageType.success),
+        'Brand added. Save configuration to apply.',
+        SettingsMessageType.success,
+      ),
     );
   }
 
   void removeBrand(String name) {
+    final brands = state.brands.where((b) => b != name).toList();
     state = state.copyWith(
-      brands: state.brands.where((b) => b != name).toList(),
+      brands: brands,
+      settings: state.settings.copyWith(itemBrands: brands),
     );
   }
 
@@ -212,26 +311,34 @@ class SettingsController extends Notifier<SettingsState> {
       final brands = await _repo.propagateBrands();
       state = state.copyWith(
         brands: brands,
+        settings: state.settings.copyWith(itemBrands: brands),
         message: SettingsMessage(
-            'Propagated ${brands.length} unique brands from catalog.',
-            SettingsMessageType.success),
+          'Propagated ${brands.length} unique brands from catalog.',
+          SettingsMessageType.success,
+        ),
       );
-    } on ApiException catch (e) {
-      _err('Propagate failed: ${e.message}');
+    } catch (e) {
+      _err('Propagate failed: ${e.toString()}');
     }
   }
 
-  Future<void> saveItemConfig({required bool wholesaleAutoApply}) async {
+  Future<void> saveItemConfig({
+    required bool wholesaleAutoApply,
+    required String itemImagesRootPath,
+  }) async {
+    final imagesRoot = itemImagesRootPath.trim();
     await _save(
       {
         'itemCategories': state.categories,
         'itemBrands': state.brands,
         'itemsWholesaleAutoApply': wholesaleAutoApply,
+        'itemImagesRootPath': imagesRoot,
       },
       state.settings.copyWith(
         itemCategories: List.of(state.categories),
         itemBrands: List.of(state.brands),
         itemsWholesaleAutoApply: wholesaleAutoApply,
+        itemImagesRootPath: imagesRoot,
       ),
       'Item configuration saved successfully!',
       'Failed to save item configuration',

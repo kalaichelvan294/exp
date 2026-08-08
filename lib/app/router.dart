@@ -1,11 +1,11 @@
 import 'package:go_router/go_router.dart';
 
+import '../features/auth/presentation/admin_guard.dart';
 import '../features/billing/presentation/billing_page.dart';
 import '../features/bills/presentation/bills_page.dart';
 import '../features/bulk/presentation/bulk_page.dart';
 import '../features/inventory/presentation/inventory_page.dart';
 import '../features/items/presentation/items_page.dart';
-import '../features/reports/presentation/reports_page.dart';
 import '../features/settings/presentation/settings_page.dart';
 import 'app_routes.dart';
 import 'app_shell.dart';
@@ -31,27 +31,22 @@ GoRouter buildRouter() {
           ),
           GoRoute(
             path: AppRoutes.items.path,
-            builder: (_, _) => const ItemsPage(),
+            builder: (_, _) => const AdminGuard(child: ItemsPage()),
           ),
           GoRoute(
             path: AppRoutes.inventory.path,
-            builder: (_, _) => const InventoryPage(),
-          ),
-          GoRoute(
-            path: AppRoutes.reports.path,
-            builder: (_, _) => const ReportsPage(),
+            builder: (_, _) => const AdminGuard(child: InventoryPage()),
           ),
           GoRoute(
             path: AppRoutes.bulk.path,
-            builder: (_, _) => const BulkPage(),
+            builder: (_, _) => const AdminGuard(child: BulkPage()),
           ),
           GoRoute(
             path: AppRoutes.settings.path,
-            builder: (_, _) => const SettingsPage(),
+            builder: (_, _) => const AdminGuard(child: SettingsPage()),
           ),
         ],
       ),
     ],
   );
 }
-

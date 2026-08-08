@@ -6,66 +6,62 @@ import 'environment.dart';
 ///
 /// Values can be overridden at launch time via `--dart-define`:
 ///   flutter run -d windows --dart-define=POS_ENV=staging \
-///     --dart-define=POS_API_BASE_URL=http://10.0.0.5:8787 \
-///     --dart-define=POS_DB_CLIENT=postgres \
-///     --dart-define=POS_DATABASE_URL=postgres://user:pass@host:5432/pos294
+///     --dart-define=POS_DATABASE_URL=mysql://root:MysqlRoot@localhost:3306/pos294
 class AppConfig {
   const AppConfig({
     required this.environment,
-    required this.apiBaseUrl,
     required this.appVersion,
-    this.dbClient = DbClient.postgres,
-    this.databaseUrl = '',
-    this.sqliteDbPath = '',
-    this.apiTimeout = const Duration(seconds: 20),
+    required this.databaseUrl,
+    required this.databaseHost,
+    required this.databasePort,
+    required this.databaseName,
+    required this.databaseUser,
+    required this.databasePassword,
   });
 
   final AppEnvironment environment;
-  final String apiBaseUrl;
   final String appVersion;
-
-  /// Database backend the bridge connects to (default Postgres).
-  final DbClient dbClient;
-
-  /// Postgres connection string, used when [dbClient] is Postgres.
   final String databaseUrl;
-
-  /// SQLite file path, used when [dbClient] is SQLite.
-  final String sqliteDbPath;
-
-  final Duration apiTimeout;
+  final String databaseHost;
+  final int databasePort;
+  final String databaseName;
+  final String databaseUser;
+  final String databasePassword;
 
   bool get isProduction => environment == AppEnvironment.production;
 
   static const _defaultDatabaseUrl =
-      'postgres://postgres:postgres@localhost:5432/pos294';
-  static const _defaultSqlitePath = 'data/pos-294.sqlite';
+      'mysql://root:MysqlRoot@localhost:3306/pos294';
 
   factory AppConfig.fromEnvironment() {
     final env = AppEnvironmentX.fromName(
       const String.fromEnvironment('POS_ENV', defaultValue: 'development'),
     );
-    const overrideUrl = String.fromEnvironment('POS_API_BASE_URL');
-    final dbClient = DbClientX.fromName(
-      const String.fromEnvironment('POS_DB_CLIENT', defaultValue: 'postgres'),
-    );
-    const databaseUrl = String.fromEnvironment('POS_DATABASE_URL');
-    const sqlitePath = String.fromEnvironment('POS_SQLITE_DB_PATH');
+    const databaseUrl =
+    String.fromEnvironment('POS_DATABASE_URL', defaultValue: _defaultDatabaseUrl);
+
+    final uri = Uri.parse(databaseUrl);
     return AppConfig(
       environment: env,
-      apiBaseUrl: overrideUrl.isNotEmpty ? overrideUrl : env.defaultBaseUrl,
       appVersion: const String.fromEnvironment(
         'POS_APP_VERSION',
         defaultValue: '0.1.0',
       ),
-      dbClient: dbClient,
-      databaseUrl: databaseUrl.isNotEmpty ? databaseUrl : _defaultDatabaseUrl,
-      sqliteDbPath: sqlitePath.isNotEmpty ? sqlitePath : _defaultSqlitePath,
+      databaseUrl: databaseUrl,
+      databaseHost: uri.host.isEmpty ? 'localhost' : uri.host,
+      databasePort: uri.port == 0 ? 3306 : uri.port,
+      databaseName: uri.path.replaceFirst('/', ''),
+      databaseUser: uri.userInfo.isEmpty ? 'root' : uri.userInfo.split(':')[0],
+      databasePassword: uri.userInfo.isEmpty
+          ? 'MysqlRoot'
+          : uri.userInfo.split(':').length > 1
+          ? uri.userInfo.split(':')[1]
+          : 'MysqlRoot',
     );
   }
 }
 
 /// Overridden in `main()` once the concrete config is resolved.
 final appConfigProvider = Provider<AppConfig>(
-  (ref) => throw UnimplementedError('appConfigProvider must be overridden'),
+      (ref) => throw UnimplementedError('appConfigProvider must be overridden'),
 );

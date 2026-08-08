@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_exception.dart';
+import '../../settings/application/settings_controller.dart';
 import '../../settings/data/settings_repository.dart';
 import '../data/bulk_file_service.dart';
 import '../data/bulk_repository.dart';
@@ -19,6 +19,13 @@ class BulkController extends Notifier<BulkState> {
 
   @override
   BulkState build() {
+    ref.listen<bool>(
+      settingsControllerProvider.select((s) => s.invControlEnabled),
+      (previous, next) {
+        if (previous == next) return;
+        state = state.copyWith(invControlEnabled: next);
+      },
+    );
     Future.microtask(_init);
     return const BulkState();
   }
@@ -41,7 +48,6 @@ class BulkController extends Notifier<BulkState> {
       state = state.withTab(type, next);
 
   String _clean(Object error) {
-    if (error is ApiException) return error.message;
     return error.toString().replaceFirst(RegExp(r'^Error:\s*'), '');
   }
 
@@ -99,7 +105,7 @@ class BulkController extends Notifier<BulkState> {
         selectedBrandNames:
             state.selectedBrandNames.where(brands.contains).toList(),
       );
-    } on ApiException {
+    } catch (_) {
       // Filter options are best-effort; leave existing state.
     }
   }
@@ -108,7 +114,7 @@ class BulkController extends Notifier<BulkState> {
     try {
       final inv = await _settings.loadInventorySettings();
       state = state.copyWith(invControlEnabled: inv.invControlEnabled);
-    } on ApiException {
+    } catch (_) {
       state = state.copyWith(invControlEnabled: false);
     }
   }
@@ -123,7 +129,7 @@ class BulkController extends Notifier<BulkState> {
             ? tab.copyWith(clearLastBatch: true)
             : tab.copyWith(lastBatch: batch),
       );
-    } on ApiException {
+    } catch (_) {
       // Non-fatal (parity: console.error only).
     }
   }

@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_exception.dart';
+import '../../../core/images/item_image_path.dart';
 import '../data/items_repository.dart';
 import '../domain/item_form.dart';
 import 'items_state.dart';
@@ -35,7 +36,7 @@ class ItemsController extends Notifier<ItemsState> {
         _repo.loadBrands(),
       ]);
       state = state.copyWith(categories: results[0], brands: results[1]);
-    } on ApiException {
+    } catch (_) {
       // Options are non-critical; leave existing values.
     }
   }
@@ -61,12 +62,14 @@ class ItemsController extends Notifier<ItemsState> {
         loading: false,
         message: ItemsMessage('${result.total} item(s) found.'),
       );
-    } on ApiException catch (e) {
+    } catch (e) {
       state = state.copyWith(
         loading: false,
         items: const [],
-        message: ItemsMessage('Failed to load items: ${e.message}',
-            isError: true),
+        message: ItemsMessage(
+          'Failed to load items: ${e.toString()}',
+          isError: true,
+        ),
       );
     }
   }
@@ -98,10 +101,12 @@ class ItemsController extends Notifier<ItemsState> {
       await _repo.deleteItem(itemId);
       state = state.copyWith(message: const ItemsMessage('Item deleted.'));
       await loadItems();
-    } on ApiException catch (e) {
+    } catch (e) {
       state = state.copyWith(
-        message: ItemsMessage('Failed to delete item: ${e.message}',
-            isError: true),
+        message: ItemsMessage(
+          'Failed to delete item: ${e.toString()}',
+          isError: true,
+        ),
       );
     }
   }
@@ -131,23 +136,32 @@ class ItemsController extends Notifier<ItemsState> {
     }
     state = state.copyWith(
       skuChecking: true,
-      skuValidation: const SkuValidation(valid: false, message: 'Checking SKU...'),
+      skuValidation: const SkuValidation(
+        valid: false,
+        message: 'Checking SKU...',
+      ),
     );
-    _skuTimer = Timer(_skuDebounce,
-        () => _runSkuValidation(sku, excludeItemId: excludeItemId));
+    _skuTimer = Timer(
+      _skuDebounce,
+      () => _runSkuValidation(sku, excludeItemId: excludeItemId),
+    );
   }
 
-  Future<SkuValidation> _runSkuValidation(String sku,
-      {String excludeItemId = ''}) async {
+  Future<SkuValidation> _runSkuValidation(
+    String sku, {
+    String excludeItemId = '',
+  }) async {
     final token = ++_skuToken;
     try {
       final result = await _repo.validateSku(sku, excludeItemId: excludeItemId);
       if (token != _skuToken) return result;
       state = state.copyWith(skuValidation: result, skuChecking: false);
       return result;
-    } on ApiException catch (e) {
-      final failed =
-          SkuValidation(valid: false, message: 'SKU validation failed: ${e.message}');
+    } catch (e) {
+      final failed = SkuValidation(
+        valid: false,
+        message: 'SKU validation failed: ${e.toString()}',
+      );
       if (token == _skuToken) {
         state = state.copyWith(skuValidation: failed, skuChecking: false);
       }
@@ -159,7 +173,12 @@ class ItemsController extends Notifier<ItemsState> {
 
   /// Validates and saves the item. Returns true on success so the dialog can
   /// close. Sets an error message otherwise.
-  Future<bool> saveItem(ItemFormData form, {String editingItemId = ''}) async {
+  Future<bool> saveItem(
+    ItemFormData form, {
+    String editingItemId = '',
+    String selectedImagePath = '',
+    String itemImagesRootPath = '',
+  }) async {
     final clientError = form.validate();
     if (clientError != null) {
       state = state.copyWith(message: ItemsMessage(clientError, isError: true));
@@ -176,9 +195,20 @@ class ItemsController extends Notifier<ItemsState> {
       state = state.copyWith(
         submitting: false,
         message: ItemsMessage(
-            skuResult.message.isEmpty ? 'SKU is invalid.' : skuResult.message,
-            isError: true),
+          skuResult.message.isEmpty ? 'SKU is invalid.' : skuResult.message,
+          isError: true,
+        ),
       );
+      return false;
+    }
+
+    final imageOk = await _persistSelectedImage(
+      sku: ItemFormData.normalizeSku(form.sku),
+      selectedImagePath: selectedImagePath,
+      configuredRootPath: itemImagesRootPath,
+    );
+    if (!imageOk) {
+      state = state.copyWith(submitting: false);
       return false;
     }
 
@@ -186,24 +216,116 @@ class ItemsController extends Notifier<ItemsState> {
       if (editingItemId.isNotEmpty) {
         await _repo.updateItem(editingItemId, form.toPayload());
         state = state.copyWith(
-            submitting: false, message: const ItemsMessage('Item updated.'));
+          submitting: false,
+          message: const ItemsMessage('Item updated.'),
+        );
       } else {
         await _repo.createItem(form.toPayload());
         state = state.copyWith(
-            submitting: false, message: const ItemsMessage('Item added.'));
+          submitting: false,
+          message: const ItemsMessage('Item added.'),
+        );
       }
       await loadItems();
       return true;
-    } on ApiException catch (e) {
+    } catch (e) {
       state = state.copyWith(
         submitting: false,
-        message: ItemsMessage('Failed to save item: ${e.message}',
-            isError: true),
+        message: ItemsMessage(
+          'Failed to save item: ${e.toString()}',
+          isError: true,
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> savePickedImage({
+    required String sku,
+    required String selectedImagePath,
+    required String itemImagesRootPath,
+  }) {
+    return _persistSelectedImage(
+      sku: ItemFormData.normalizeSku(sku),
+      selectedImagePath: selectedImagePath,
+      configuredRootPath: itemImagesRootPath,
+    );
+  }
+
+  Future<bool> _persistSelectedImage({
+    required String sku,
+    required String selectedImagePath,
+    required String configuredRootPath,
+  }) async {
+    final sourcePath = selectedImagePath.trim();
+    if (sourcePath.isEmpty) return true;
+    final lowerSource = sourcePath.toLowerCase();
+    if (!(lowerSource.endsWith('.jpg') || lowerSource.endsWith('.jpeg'))) {
+      state = state.copyWith(
+        message: const ItemsMessage(
+          'Only JPG images are allowed.',
+          isError: true,
+        ),
+      );
+      return false;
+    }
+
+    final storageRoot = ItemImagePath.resolveStorageDirectory(
+      configuredRootPath,
+    );
+    if (storageRoot == null || storageRoot.trim().isEmpty) {
+      state = state.copyWith(
+        message: const ItemsMessage(
+          'Configure Item Images Root Path in Settings before saving images.',
+          isError: true,
+        ),
+      );
+      return false;
+    }
+
+    try {
+      final source = File(sourcePath);
+      if (!await source.exists()) {
+        state = state.copyWith(
+          message: const ItemsMessage(
+            'Selected image file was not found.',
+            isError: true,
+          ),
+        );
+        return false;
+      }
+      final fileName = ItemImagePath.fileNameForSku(sku);
+      final destinationPath = ItemImagePath.resolve(
+        sku: sku,
+        configuredRootPath: storageRoot,
+        fallbackHost: 'localhost',
+      ).filePath;
+      if (destinationPath == null || destinationPath.trim().isEmpty) {
+        state = state.copyWith(
+          message: const ItemsMessage(
+            'Invalid Item Images Root Path.',
+            isError: true,
+          ),
+        );
+        return false;
+      }
+      final destination = File(destinationPath);
+      await destination.parent.create(recursive: true);
+      await source.copy(destination.path);
+      state = state.copyWith(message: ItemsMessage('Saved image as $fileName'));
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        message: ItemsMessage(
+          'Failed to save item image: ${e.toString()}',
+          isError: true,
+        ),
       );
       return false;
     }
   }
 }
 
-final itemsControllerProvider =
-    NotifierProvider<ItemsController, ItemsState>(ItemsController.new);
+final itemsControllerProvider = NotifierProvider<ItemsController, ItemsState>(
+  ItemsController.new,
+);

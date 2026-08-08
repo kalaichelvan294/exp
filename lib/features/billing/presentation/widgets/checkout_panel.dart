@@ -6,7 +6,6 @@ import '../../application/billing_controller.dart';
 import '../../domain/bill_totals.dart';
 import '../../domain/billing_enums.dart';
 import '../../domain/money.dart';
-import 'app_card.dart';
 import 'radio_dot.dart';
 
 /// Checkout sidebar (25% width per POS billing screen rules). Contains payment
@@ -49,30 +48,27 @@ class _CheckoutPanelState extends ConsumerState<CheckoutPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: AppCard(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('Checkout', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: AppSpacing.x16),
-                  _label('Payment Mode', theme),
-                  const SizedBox(height: AppSpacing.x8),
-                  _paymentModes(state.paymentMode),
-                  const SizedBox(height: AppSpacing.x24),
-                  _label('Discount', theme),
-                  const SizedBox(height: AppSpacing.x8),
-                  _discountRow(state.discountMode, expected),
-                  const Divider(height: AppSpacing.x32),
-                  _summaryRow('Items', '${state.cart.length}', theme),
-                  _summaryRow('Subtotal',
-                      Money.format(totals.subtotalPaise), theme),
-                  _summaryRow('Discount',
-                      '-${Money.format(totals.discountPaise)}', theme),
-                  const SizedBox(height: AppSpacing.x8),
-                  _totalRow(totals, theme),
-                ],
-              ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Checkout', style: theme.textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.x16),
+                _label('Payment Mode', theme),
+                const SizedBox(height: AppSpacing.x8),
+                _paymentModes(state.paymentMode),
+                const SizedBox(height: AppSpacing.x24),
+                _label('Discount', theme),
+                const SizedBox(height: AppSpacing.x8),
+                _discountRow(state.discountMode, expected),
+                const Divider(height: AppSpacing.x32),
+                _summaryRow('Items', '${state.cart.length}', theme),
+                _summaryRow('Subtotal', Money.format(totals.subtotalPaise), theme),
+                _summaryRow(
+                    'Discount', '-${Money.format(totals.discountPaise)}', theme),
+                const SizedBox(height: AppSpacing.x8),
+                _totalRow(totals, theme),
+              ],
             ),
           ),
         ),

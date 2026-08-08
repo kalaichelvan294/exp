@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/database/db_providers.dart';
 import '../core/shortcuts/app_shortcuts.dart';
 import '../core/theme/app_theme.dart';
 import 'app_routes.dart';
@@ -20,6 +21,21 @@ class _PosAppState extends ConsumerState<PosApp> {
   late final GoRouter _router = buildRouter();
 
   @override
+  void initState() {
+    super.initState();
+    // Initialize database connection on app startup
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final dbConnection = ref.read(dbConnectionProvider);
+        await dbConnection.connect();
+        debugPrint('Database connection established');
+      } catch (e) {
+        debugPrint('Database connection failed: $e');
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final appearance = ref.watch(appearanceControllerProvider);
     return MaterialApp.router(
@@ -31,9 +47,9 @@ class _PosAppState extends ConsumerState<PosApp> {
       routerConfig: _router,
       builder: (context, child) {
         final scaled = MediaQuery.of(context).textScaler.clamp(
-              minScaleFactor: appearance.fontScale,
-              maxScaleFactor: appearance.fontScale,
-            );
+          minScaleFactor: appearance.fontScale,
+          maxScaleFactor: appearance.fontScale,
+        );
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: scaled),
           child: _GlobalShortcuts(
@@ -60,7 +76,6 @@ class _GlobalShortcuts extends StatelessWidget {
       shortcuts: AppShortcuts.global(
         billingRoute: AppRoutes.billing.path,
         itemsRoute: AppRoutes.items.path,
-        reportsRoute: AppRoutes.reports.path,
         settingsRoute: AppRoutes.settings.path,
       ),
       child: Actions(

@@ -11,7 +11,9 @@ import '../../domain/money.dart';
 /// + brand, SKU, qty stepper, rate (with wholesale/retail tier detail), line
 /// total, and a remove action. Numeric columns are right-aligned.
 class CartTable extends ConsumerWidget {
-  const CartTable({super.key});
+  const CartTable({super.key, required this.onQtyConfirmed});
+
+  final VoidCallback onQtyConfirmed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,13 +23,29 @@ class CartTable extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (state.hasMergeableDuplicates)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.x8),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: ref
+                    .read(billingControllerProvider.notifier)
+                    .mergeDuplicateLines,
+                icon: const Icon(Icons.call_merge_outlined, size: 18),
+                label: const Text('Merge Same Items'),
+              ),
+            ),
+          ),
         _header(theme),
         const Divider(height: 1),
         Expanded(
           child: state.cart.isEmpty
               ? Center(
-                  child: Text('No items added',
-                      style: theme.textTheme.bodySmall),
+                  child: Text(
+                    'No items added',
+                    style: theme.textTheme.bodySmall,
+                  ),
                 )
               : ListView.separated(
                   itemCount: state.cart.length,
@@ -36,6 +54,8 @@ class CartTable extends ConsumerWidget {
                     index: index,
                     line: state.cart[index],
                     selected: index == state.selectedCartIndex,
+                    qtyFocusRequestToken: state.qtyFocusRequestToken,
+                    onQtyConfirmed: onQtyConfirmed,
                   ),
                 ),
         ),
@@ -66,8 +86,12 @@ class CartTable extends ConsumerWidget {
     );
   }
 
-  Widget _cell(String text, TextStyle? style,
-      {required int flex, TextAlign align = TextAlign.left}) {
+  Widget _cell(
+    String text,
+    TextStyle? style, {
+    required int flex,
+    TextAlign align = TextAlign.left,
+  }) {
     return Expanded(
       flex: flex,
       child: Text(text, style: style, textAlign: align),
@@ -75,27 +99,88 @@ class CartTable extends ConsumerWidget {
   }
 }
 
-class _CartRow extends ConsumerWidget {
+class _CartRow extends ConsumerStatefulWidget {
   const _CartRow({
     required this.index,
     required this.line,
     required this.selected,
+    required this.qtyFocusRequestToken,
+    required this.onQtyConfirmed,
   });
 
   final int index;
   final CartLine line;
   final bool selected;
+  final int qtyFocusRequestToken;
+  final VoidCallback onQtyConfirmed;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CartRow> createState() => _CartRowState();
+}
+
+class _CartRowState extends ConsumerState<_CartRow> {
+  late final TextEditingController _qtyController;
+  late final FocusNode _qtyFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _qtyController = TextEditingController(text: widget.line.qtyDisplay);
+    _qtyFocusNode = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.line.qtyDisplay != widget.line.qtyDisplay &&
+        !_qtyFocusNode.hasFocus) {
+      _qtyController.text = widget.line.qtyDisplay;
+    }
+    if (widget.selected &&
+        oldWidget.qtyFocusRequestToken != widget.qtyFocusRequestToken) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _qtyFocusNode.requestFocus();
+        _qtyController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _qtyController.text.length,
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _qtyFocusNode.dispose();
+    _qtyController.dispose();
+    super.dispose();
+  }
+
+  void _commitQty() {
+    final c = ref.read(billingControllerProvider.notifier);
+    final parsed = num.tryParse(_qtyController.text.trim());
+    if (parsed == null || parsed < 0) {
+      _qtyController.text = widget.line.qtyDisplay;
+      return;
+    }
+    c.updateQty(widget.index, parsed, commit: true);
+  }
+
+  void _commitQtyAndFocusSearch() {
+    _commitQty();
+    widget.onQtyConfirmed();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = ref.read(billingControllerProvider.notifier);
     final theme = Theme.of(context);
     final bodyStyle = theme.textTheme.bodyMedium;
 
     return InkWell(
-      onTap: () => c.selectCartLine(index),
+      onTap: () => c.selectCartLine(widget.index),
       child: Container(
-        color: selected ? AppColors.neutral50 : Colors.transparent,
+        color: widget.selected ? AppColors.neutral50 : Colors.transparent,
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.x16,
           vertical: AppSpacing.x8,
@@ -103,15 +188,21 @@ class _CartRow extends ConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(flex: 1, child: Text('${index + 1}', style: bodyStyle)),
+            Expanded(
+              flex: 1,
+              child: Text('${widget.index + 1}', style: bodyStyle),
+            ),
             Expanded(flex: 6, child: _itemCell(theme)),
-            Expanded(flex: 3, child: Text(line.skuDisplay, style: bodyStyle)),
-            Expanded(flex: 3, child: _qtyStepper(c)),
+            Expanded(
+              flex: 3,
+              child: Text(widget.line.skuDisplay, style: bodyStyle),
+            ),
+            Expanded(flex: 3, child: _qtyEditor(c)),
             Expanded(flex: 3, child: _rateCell(theme)),
             Expanded(
               flex: 3,
               child: Text(
-                Money.format(line.lineTotalPaise),
+                Money.format(widget.line.lineTotalPaise),
                 textAlign: TextAlign.right,
                 style: bodyStyle?.copyWith(fontWeight: FontWeight.w600),
               ),
@@ -124,7 +215,7 @@ class _CartRow extends ConsumerWidget {
                   icon: const Icon(Icons.delete_outline, size: 18),
                   color: AppColors.neutral500,
                   tooltip: 'Remove item',
-                  onPressed: () => c.removeLine(index),
+                  onPressed: () => c.removeLine(widget.index),
                 ),
               ),
             ),
@@ -138,45 +229,81 @@ class _CartRow extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(line.displayName,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w600)),
-        if (line.brandName.isNotEmpty)
-          Text('Brand: ${line.brandName}', style: theme.textTheme.bodySmall),
+        Text(
+          widget.line.displayName,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (widget.line.brandName.isNotEmpty)
+          Text(
+            'Brand: ${widget.line.brandName}',
+            style: theme.textTheme.bodySmall,
+          ),
       ],
     );
   }
 
   Widget _rateCell(ThemeData theme) {
-    final tier = line.priceTier == PriceTier.wholesale ? ' (Wholesale)' : '';
+    final tier = widget.line.priceTier == PriceTier.wholesale
+        ? ' (Wholesale)'
+        : '';
     String? detail;
-    if (line.hasWholesaleConfig) {
-      detail = line.priceTier == PriceTier.wholesale
-          ? 'Applied: Wholesale ${Money.format(line.wholesaleRatePaise!)}'
-          : 'Applied: Retail ${Money.format(line.retailRatePaise)}';
+    if (widget.line.hasWholesaleConfig) {
+      detail = widget.line.priceTier == PriceTier.wholesale
+          ? 'Applied: Wholesale ${Money.format(widget.line.wholesaleRatePaise!)}'
+          : 'Applied: Retail ${Money.format(widget.line.retailRatePaise)}';
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text('${Money.format(line.ratePaise)}$tier',
-            textAlign: TextAlign.right, style: theme.textTheme.bodyMedium),
+        Text(
+          '${Money.format(widget.line.ratePaise)}$tier',
+          textAlign: TextAlign.right,
+          style: theme.textTheme.bodyMedium,
+        ),
         if (detail != null)
-          Text(detail, textAlign: TextAlign.right,
-              style: theme.textTheme.bodySmall),
+          Text(
+            detail,
+            textAlign: TextAlign.right,
+            style: theme.textTheme.bodySmall,
+          ),
       ],
     );
   }
 
-  Widget _qtyStepper(BillingController c) {
-    final step = line.pricingType == PricingType.weight ? 0.1 : 1;
+  Widget _qtyEditor(BillingController c) {
+    final isWeight = widget.line.pricingType == PricingType.weight;
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        _stepButton(Icons.remove, () => c.bumpQty(index, -step)),
+        _stepButton(
+          Icons.remove,
+          () => c.bumpQty(widget.index, isWeight ? -0.1 : -1),
+        ),
         const SizedBox(width: AppSpacing.x4),
-        Text(line.qtyDisplay),
+        SizedBox(
+          width: isWeight ? 84 : 68,
+          child: TextField(
+            controller: _qtyController,
+            focusNode: _qtyFocusNode,
+            textAlign: TextAlign.right,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _commitQtyAndFocusSearch(),
+            onEditingComplete: _commitQty,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            ),
+          ),
+        ),
         const SizedBox(width: AppSpacing.x4),
-        _stepButton(Icons.add, () => c.bumpQty(index, step)),
+        _stepButton(
+          Icons.add,
+          () => c.bumpQty(widget.index, isWeight ? 0.1 : 1),
+        ),
       ],
     );
   }

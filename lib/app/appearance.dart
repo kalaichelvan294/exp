@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/api/api_exception.dart';
 import '../features/settings/data/settings_repository.dart';
 import '../features/settings/domain/app_settings.dart';
 
@@ -44,7 +43,7 @@ class AppearanceController extends Notifier<AppearanceState> {
         themeMode: settings.themeMode,
         uiSizeVariant: settings.uiSizeVariant,
       );
-    } on ApiException {
+    } catch (_) {
       // Keep defaults when settings are unavailable (parity with the
       // appearance.js fallback to an empty settings object).
     }

@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_exception.dart';
 import '../../items/data/items_repository.dart';
 import '../../items/domain/item.dart';
+import '../../settings/application/settings_controller.dart';
 import '../domain/inventory_adjust.dart';
+import '../domain/inventory_settings.dart';
 import 'inventory_state.dart';
 
 /// Inventory module controller. Ports inventory-controller.js: settings gating,
@@ -14,6 +15,25 @@ class InventoryController extends Notifier<InventoryState> {
 
   @override
   InventoryState build() {
+    ref.listen<bool>(
+      settingsControllerProvider.select((s) => s.invControlEnabled),
+      (previous, next) {
+        if (previous == next) return;
+        state = state.copyWith(
+          settings: InventorySettings(
+            invControlEnabled: next,
+            invLowStockQty: state.settings.invLowStockQty,
+            invLowStockWeight: state.settings.invLowStockWeight,
+          ),
+          items: next ? state.items : const [],
+          total: next ? state.total : 0,
+          loading: next ? state.loading : false,
+        );
+        if (next && state.settingsLoaded) {
+          loadItems();
+        }
+      },
+    );
     Future.microtask(_bootstrap);
     return const InventoryState();
   }
@@ -25,8 +45,8 @@ class InventoryController extends Notifier<InventoryState> {
       if (settings.invControlEnabled) {
         await loadItems();
       }
-    } on ApiException catch (e) {
-      state = state.copyWith(settingsLoaded: true, error: e.message);
+    } catch (e) {
+      state = state.copyWith(settingsLoaded: true, error: e.toString());
     }
   }
 
@@ -46,9 +66,9 @@ class InventoryController extends Notifier<InventoryState> {
         loading: false,
         error: null,
       );
-    } on ApiException catch (e) {
+    } catch (e) {
       state = state.copyWith(
-          loading: false, items: const [], error: e.message);
+          loading: false, items: const [], error: e.toString());
     }
   }
 
@@ -119,7 +139,7 @@ class InventoryController extends Notifier<InventoryState> {
       await _repo.adjustInventory(itemId, adjustment);
       await loadItems();
       return true;
-    } on ApiException {
+    } catch (_) {
       return false;
     }
   }

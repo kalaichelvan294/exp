@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
-import '../../../core/api/api_endpoints.dart';
-import '../../../core/api/api_providers.dart';
+import '../../../core/database/db_connection.dart';
+import '../../../core/database/db_providers.dart';
 import '../domain/bill_data.dart';
 import '../domain/product.dart';
 
@@ -59,56 +58,51 @@ class HeldBillsPage {
   final int holdsLeft;
 }
 
-/// API-bridge backed data source for the Sales Desk (Phase 2 scope).
 class BillingRepository {
-  BillingRepository(this._api);
+  BillingRepository(this._db);
 
-  final ApiClient _api;
+  final DbConnection _db;
 
   Future<List<Product>> searchProducts(String query, {int limit = 8}) async {
-    final response = await _api.postJson(
-      ApiEndpoints.productsSearch,
-      body: {'query': query, 'limit': limit},
+    final escapedQuery = query.replaceAll("'", "''").toLowerCase();
+    final rows = await _db.query(
+      "SELECT * FROM products WHERE LOWER(name) LIKE '%$escapedQuery%' OR LOWER(sku) LIKE '%$escapedQuery%' LIMIT $limit",
     );
-    return _asList(response)
-        .whereType<Map<String, dynamic>>()
-        .map(Product.fromJson)
-        .toList();
+    return rows.map(Product.fromJson).toList();
   }
 
   Future<Product?> findExactProduct(String query) async {
-    final response = await _api.postJson(
-      ApiEndpoints.productsFindExact,
-      body: {'query': query},
+    final escapedQuery = query.replaceAll("'", "''");
+    final rows = await _db.query(
+      "SELECT * FROM products WHERE sku = '$escapedQuery' OR name = '$escapedQuery' LIMIT 1",
     );
-    final data = response['data'] ?? response;
-    if (data is Map<String, dynamic> && data['id'] != null) {
-      return Product.fromJson(data);
-    }
-    return null;
+    return rows.isEmpty ? null : Product.fromJson(rows.first);
   }
 
   Future<SaveBillResult> saveBill(BillData bill) async {
-    final response = await _api.postJson(
-      ApiEndpoints.billingSave,
-      body: bill.toJson(),
+    final escapedBillId = bill.billId.replaceAll("'", "''");
+    final billDataStr = bill.toJson().toString().replaceAll("'", "''");
+    await _db.execute(
+      "INSERT INTO bills (bill_id, bill_data, created_at) VALUES ('$escapedBillId', '$billDataStr', CURRENT_TIMESTAMP)",
     );
-    return SaveBillResult(
-      billId: _resolveBillId(response, fallback: bill.billId),
-    );
+    return SaveBillResult(billId: escapedBillId);
   }
 
   Future<HoldResult> holdBill(BillData bill) async {
-    final response = await _api.postJson(
-      ApiEndpoints.billingHold,
-      body: bill.toJson(),
+    final escapedBillId = bill.billId.replaceAll("'", "''");
+    final billDataStr = bill.toJson().toString().replaceAll("'", "''");
+    await _db.execute(
+      "INSERT INTO bill_holds (bill_id, bill_data, created_at) VALUES ('$escapedBillId', '$billDataStr', CURRENT_TIMESTAMP)",
     );
-    return HoldResult(holdsLeft: _asInt(response['holdsLeft']));
+    final countResult = await _db.query(
+      'SELECT COUNT(*) as count FROM bill_holds',
+    );
+    final holdsLeft = (countResult.isNotEmpty
+        ? int.parse(countResult.first['count'].toString())
+        : 0);
+    return HoldResult(holdsLeft: holdsLeft);
   }
 
-  // ── Saved bills (Phase 3) ─────────────────────────────────────────────────
-
-  /// Lists saved bills with optional filters (parity with `billing:list`).
   Future<BillListResult> listBills({
     int page = 1,
     int pageSize = 10,
@@ -117,107 +111,101 @@ class BillingRepository {
     String dateFrom = '',
     String dateTo = '',
   }) async {
-    final response = await _api.getJson(
-      ApiEndpoints.billingList,
-      query: {
-        'page': page,
-        'pageSize': pageSize,
-        'billId': billId,
-        'paymentMode': paymentMode,
-        'dateFrom': dateFrom,
-        'dateTo': dateTo,
-      },
+    final offset = (page - 1) * pageSize;
+    String whereClause = 'WHERE 1=1';
+
+    if (billId.isNotEmpty) {
+      final escapedBillId = billId.replaceAll("'", "''");
+      whereClause += " AND bill_id LIKE '%$escapedBillId%'";
+    }
+    if (paymentMode.isNotEmpty) {
+      final escapedPaymentMode = paymentMode.replaceAll("'", "''");
+      whereClause +=
+          " AND JSON_UNQUOTE(JSON_EXTRACT(bill_data, '\$.paymentMode')) = '$escapedPaymentMode'";
+    }
+    if (dateFrom.isNotEmpty) {
+      whereClause += " AND created_at >= '$dateFrom'";
+    }
+    if (dateTo.isNotEmpty) {
+      whereClause += " AND created_at <= '$dateTo'";
+    }
+
+    final totalResult = await _db.query(
+      'SELECT COUNT(*) as count FROM bills $whereClause',
     );
+    final total = totalResult.isNotEmpty
+        ? int.parse(totalResult.first['count'].toString())
+        : 0;
+
+    final rows = await _db.query(
+      'SELECT bill_id, bill_data, created_at FROM bills $whereClause ORDER BY created_at DESC LIMIT $pageSize OFFSET $offset',
+    );
+
     return BillListResult(
-      total: _asInt(response['total']),
-      page: response.containsKey('page') ? _asInt(response['page']) : page,
-      pageSize: response.containsKey('pageSize')
-          ? _asInt(response['pageSize'])
-          : pageSize,
-      rows: _asList(response['rows'] ?? response)
-          .whereType<Map<String, dynamic>>()
-          .toList(),
+      total: total,
+      page: page,
+      pageSize: pageSize,
+      rows: rows,
     );
   }
 
-  /// Fetches a single saved bill and returns its raw `billData` map.
   Future<Map<String, dynamic>> getBill(String billId) async {
-    final response = await _api.getJson(ApiEndpoints.billingGet(billId));
-    final data = response['billData'];
-    if (data is Map<String, dynamic>) return data;
-    throw StateError('Bill $billId was not found.');
+    final escapedBillId = billId.replaceAll("'", "''");
+    final rows = await _db.query(
+      "SELECT bill_data FROM bills WHERE bill_id = '$escapedBillId' LIMIT 1",
+    );
+    if (rows.isEmpty) throw StateError('Bill $billId was not found.');
+    return rows.first['bill_data'] as Map<String, dynamic>;
   }
 
-  /// Updates a saved bill (parity with `billing:update`).
   Future<void> updateBill(String billId, BillData bill) async {
-    await _api.putJson(
-      ApiEndpoints.billingUpdate(billId),
-      body: bill.toJson(),
+    final escapedBillId = billId.replaceAll("'", "''");
+    final billDataStr = bill.toJson().toString().replaceAll("'", "''");
+    await _db.execute(
+      "UPDATE bills SET bill_data = '$billDataStr', updated_at = CURRENT_TIMESTAMP WHERE bill_id = '$escapedBillId'",
     );
   }
 
-  /// Deletes a saved bill (parity with `billing:delete`).
   Future<void> deleteBill(String billId) async {
-    await _api.deleteJson(ApiEndpoints.billingDelete(billId));
+    final escapedBillId = billId.replaceAll("'", "''");
+    await _db.execute("DELETE FROM bills WHERE bill_id = '$escapedBillId'");
   }
 
   Future<HeldBillsPage> listHeldBills({int limit = 3}) async {
-    final response = await _api.getJson(
-      ApiEndpoints.billingListHolds,
-      query: {'limit': limit},
+    final rows = await _db.query(
+      'SELECT hold_id, bill_id, bill_data FROM bill_holds ORDER BY created_at DESC LIMIT $limit',
     );
-    final rows = _asList(response['rows']).whereType<Map<String, dynamic>>();
     final summaries = rows.map((row) {
-      final data = (row['billData'] as Map<String, dynamic>?) ?? const {};
+      final data = (row['bill_data'] as Map<String, dynamic>?) ?? const {};
       return HeldBillSummary(
-        holdId: (row['holdId'] ?? '').toString(),
-        billId: (data['billId'] ?? row['holdId'] ?? '').toString(),
-        grandTotalPaise: _asInt(data['grandTotalPaise']),
+        holdId: (row['hold_id'] ?? '').toString(),
+        billId: (data['billId'] ?? row['bill_id'] ?? '').toString(),
+        grandTotalPaise:
+            int.tryParse(data['grandTotalPaise']?.toString() ?? '0') ?? 0,
         raw: data,
       );
     }).toList();
-    final holdsLeft = response.containsKey('holdsLeft')
-        ? _asInt(response['holdsLeft'])
-        : (limit - summaries.length).clamp(0, limit);
+    final holdsLeft = (limit - summaries.length).clamp(0, limit);
     return HeldBillsPage(rows: summaries, holdsLeft: holdsLeft);
   }
 
-  /// Resumes a held bill and returns its raw `billData` map.
   Future<Map<String, dynamic>> resumeHeldBill(String holdId) async {
-    final response = await _api.postJson(ApiEndpoints.billingResumeHold(holdId));
-    final hold = response['hold'];
-    if (hold is Map<String, dynamic> &&
-        hold['billData'] is Map<String, dynamic>) {
-      return hold['billData'] as Map<String, dynamic>;
-    }
-    throw StateError('Held bill was not found.');
+    final escapedHoldId = holdId.replaceAll("'", "''");
+    final rows = await _db.query(
+      "SELECT bill_data FROM bill_holds WHERE hold_id = '$escapedHoldId' LIMIT 1",
+    );
+    if (rows.isEmpty) throw StateError('Held bill was not found.');
+    return rows.first['bill_data'] as Map<String, dynamic>;
   }
 
   Future<void> deleteHeldBill(String holdId) async {
-    await _api.deleteJson(ApiEndpoints.billingDeleteHold(holdId));
+    final escapedHoldId = holdId.replaceAll("'", "''");
+    await _db.execute(
+      "DELETE FROM bill_holds WHERE hold_id = '$escapedHoldId'",
+    );
   }
-
-  String _resolveBillId(Map<String, dynamic> result, {required String fallback}) {
-    for (final key in ['billId', 'bill_id', 'id']) {
-      final value = result[key];
-      if (value is String && value.trim().isNotEmpty) return value.trim();
-    }
-    return fallback;
-  }
-
-  List<dynamic> _asList(Object? value) {
-    if (value is List) return value;
-    if (value is Map<String, dynamic>) {
-      final data = value['data'] ?? value['rows'];
-      if (data is List) return data;
-    }
-    return const [];
-  }
-
-  int _asInt(Object? value) =>
-      value is num ? value.round() : int.tryParse('$value') ?? 0;
 }
 
 final billingRepositoryProvider = Provider<BillingRepository>(
-  (ref) => BillingRepository(ref.watch(apiClientProvider)),
+  (ref) => BillingRepository(ref.watch(dbConnectionProvider)),
 );

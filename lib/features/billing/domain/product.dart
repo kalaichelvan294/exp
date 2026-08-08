@@ -16,6 +16,8 @@ class Product {
     required this.retailPricePaise,
     this.wholesalePricePaise,
     this.wholesaleMinQty,
+    this.invCurrentQty = 0,
+    this.invCurrentWeight = 0,
     required this.ratePaise,
   });
 
@@ -29,6 +31,8 @@ class Product {
   final int retailPricePaise;
   final int? wholesalePricePaise;
   final num? wholesaleMinQty;
+  final num invCurrentQty;
+  final num invCurrentWeight;
 
   /// Default display rate from the DB (`COALESCE(retail_price_paise, rate)`).
   final int ratePaise;
@@ -37,29 +41,59 @@ class Product {
   /// exists, otherwise just the English name.
   String get displayName => nameTa.isNotEmpty ? '$nameTa / $name' : name;
 
+  String get imageFileName => '${sku.trim()}_master.jpg';
+
+  num get currentStock =>
+      pricingType == PricingType.weight ? invCurrentWeight : invCurrentQty;
+
+  String get stockDisplay {
+    final stock = currentStock;
+    if (pricingType == PricingType.weight) {
+      return '${stock.toDouble().toStringAsFixed(3)} wt';
+    }
+    return '${stock.round()} qty';
+  }
+
   factory Product.fromJson(Map<String, dynamic> json) {
     int asInt(Object? v) => (v is num) ? v.round() : int.tryParse('$v') ?? 0;
+    num asNum(Object? v) => v is num ? v : num.tryParse('$v') ?? 0;
     num? asNumOrNull(Object? v) {
       if (v == null) return null;
       if (v is num) return v;
       return num.tryParse('$v');
     }
 
-    final retail = asInt(json['retailPricePaise'] ?? json['rate']);
+    final retail = asInt(
+      json['retailPricePaise'] ??
+          json['retail_price_paise'] ??
+          json['rate'] ??
+          json['retailPrice'] ??
+          0,
+    );
+    final pricingWire = json['pricingType'] ?? json['pricing_type'] ?? 'unit';
+    final brand = json['brandName'] ?? json['brand_name'] ?? '';
+    final wholesalePaise = json['wholesalePricePaise'] ??
+        json['wholesale_price_paise'] ??
+        json['wholesalePrice'];
+    final wholesaleMinQtyValue = json['wholesaleMinQty'] ??
+        json['wholesale_min_qty'] ??
+        json['wholesaleMin'];
+
     return Product(
       id: (json['id'] ?? '').toString(),
       sku: (json['sku'] ?? json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       nameTa: (json['nameTa'] ?? '').toString(),
-      brandName: (json['brandName'] ?? '').toString(),
+      brandName: brand.toString(),
       category: (json['category'] ?? 'UNCATEGORIZED').toString(),
-      pricingType: PricingType.fromWire(json['pricingType']),
+      pricingType: PricingType.fromWire(pricingWire),
       retailPricePaise: retail,
-      wholesalePricePaise: json['wholesalePricePaise'] == null
-          ? null
-          : asInt(json['wholesalePricePaise']),
-      wholesaleMinQty: asNumOrNull(json['wholesaleMinQty']),
-      ratePaise: asInt(json['rate'] ?? retail),
+      wholesalePricePaise:
+          wholesalePaise == null ? null : asInt(wholesalePaise),
+      wholesaleMinQty: asNumOrNull(wholesaleMinQtyValue),
+      invCurrentQty: asNum(json['inv_current_qty']),
+      invCurrentWeight: asNum(json['inv_current_weight']),
+      ratePaise: asInt(json['rate'] ?? json['retail_price_paise'] ?? retail),
     );
   }
 }

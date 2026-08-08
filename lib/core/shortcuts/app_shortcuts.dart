@@ -38,19 +38,19 @@ class AppShortcuts {
   static Map<ShortcutActivator, Intent> global({
     required String billingRoute,
     required String itemsRoute,
-    required String reportsRoute,
     required String settingsRoute,
   }) {
     return <ShortcutActivator, Intent>{
-      const SingleActivator(LogicalKeyboardKey.f2):
-          NavigateModuleIntent(billingRoute),
-      const SingleActivator(LogicalKeyboardKey.f3):
-          NavigateModuleIntent(itemsRoute),
-      const SingleActivator(LogicalKeyboardKey.f4):
-          NavigateModuleIntent(reportsRoute),
-      const SingleActivator(LogicalKeyboardKey.f10):
-          NavigateModuleIntent(settingsRoute),
-      const SingleActivator(LogicalKeyboardKey.slash, control: true):
+      const SingleActivator(LogicalKeyboardKey.f2): NavigateModuleIntent(
+        billingRoute,
+      ),
+      const SingleActivator(LogicalKeyboardKey.f3): NavigateModuleIntent(
+        itemsRoute,
+      ),
+      const SingleActivator(LogicalKeyboardKey.f10): NavigateModuleIntent(
+        settingsRoute,
+      ),
+      const SingleActivator(LogicalKeyboardKey.slash):
           const FocusSearchIntent(),
       const SingleActivator(LogicalKeyboardKey.enter, control: true):
           const CheckoutIntent(),

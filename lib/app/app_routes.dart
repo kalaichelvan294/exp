@@ -6,11 +6,16 @@ class AppRoute {
     required this.path,
     required this.label,
     required this.icon,
+    this.adminOnly = false,
   });
 
   final String path;
   final String label;
   final IconData icon;
+
+  /// Admin-only modules are hidden from the sales nav and guarded at the route
+  /// (parity with the electron `adminKeys`).
+  final bool adminOnly;
 }
 
 class AppRoutes {
@@ -30,38 +35,29 @@ class AppRoutes {
     path: '/items',
     label: 'Items',
     icon: IconData(0xe1db, fontFamily: 'MaterialIcons'), // inventory_2
+    adminOnly: true,
   );
   static const inventory = AppRoute(
     path: '/inventory',
     label: 'Inventory',
     icon: IconData(0xe1a1, fontFamily: 'MaterialIcons'), // warehouse
-  );
-  static const reports = AppRoute(
-    path: '/reports',
-    label: 'Reports',
-    icon: IconData(0xe4fb, fontFamily: 'MaterialIcons'), // bar_chart
+    adminOnly: true,
   );
   static const bulk = AppRoute(
     path: '/bulk',
     label: 'Bulk Ops',
     icon: IconData(0xe2c6, fontFamily: 'MaterialIcons'), // upload_file
+    adminOnly: true,
   );
   static const settings = AppRoute(
     path: '/settings',
     label: 'Settings',
     icon: IconData(0xe8b8, fontFamily: 'MaterialIcons'), // settings
+    adminOnly: true,
   );
 
-  /// Ordered list shown in the top navigation.
-  static const List<AppRoute> all = [
-    billing,
-    bills,
-    items,
-    inventory,
-    reports,
-    bulk,
-    settings,
-  ];
+  /// Ordered list shown in the top navigation tabs.
+  static const List<AppRoute> all = [billing, bills, items, inventory, bulk];
 
   static const String initial = '/billing';
 }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/module_scaffold.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../shared/widgets/app_card.dart';
 import '../../billing/domain/billing_enums.dart';
-import '../../billing/presentation/widgets/app_card.dart';
 import '../../items/domain/item.dart';
 import '../application/inventory_controller.dart';
 import '../application/inventory_state.dart';
@@ -66,8 +67,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final state = ref.watch(inventoryControllerProvider);
     final theme = Theme.of(context);
     return ModuleScaffold(
-      title: 'Inventory',
-      description: 'Adjust stock levels and review low-stock items.',
       child: _body(state, theme),
     );
   }
@@ -124,74 +123,80 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
   }
 
   Widget _filtersBar() {
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.x16),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: SizedBox(
-              height: AppSizing.controlHeight,
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search by name, category, brand, or SKU',
-                  prefixIcon: Icon(Icons.search, size: 18),
+    return Row(
+      children: [
+        // Search and filters section (left)
+        Expanded(
+          child: Wrap(
+            spacing: AppSpacing.x16,
+            runSpacing: AppSpacing.x8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 240,
+                height: AppSizing.controlHeight,
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search by name, SKU, category',
+                    prefixIcon: Icon(Icons.search, size: 18),
+                  ),
+                  onSubmitted: (_) => _applyFilters(),
                 ),
-                onSubmitted: (_) => _applyFilters(),
               ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.x16),
-          Expanded(
-            flex: 2,
-            child: DropdownButtonFormField<String>(
-              initialValue: _trackType,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Track type'),
-              items: const [
-                DropdownMenuItem(value: '', child: Text('All')),
-                DropdownMenuItem(value: 'quantity', child: Text('Quantity')),
-                DropdownMenuItem(value: 'weight', child: Text('Weight')),
-              ],
-              onChanged: (v) => setState(() => _trackType = v ?? ''),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.x16),
-          Expanded(
-            flex: 2,
-            child: SizedBox(
-              height: AppSizing.controlHeight,
-              child: TextField(
-                controller: _qtyController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Qty ≤'),
-                onSubmitted: (_) => _applyFilters(),
+              SizedBox(
+                width: 160,
+                height: AppSizing.controlHeight,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _trackType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Track Type'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('All')),
+                    DropdownMenuItem(value: 'quantity', child: Text('Unit')),
+                    DropdownMenuItem(value: 'weight', child: Text('Weight')),
+                  ],
+                  onChanged: (v) => setState(() => _trackType = v ?? ''),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.x16),
-          Expanded(
-            flex: 2,
-            child: SizedBox(
-              height: AppSizing.controlHeight,
-              child: TextField(
-                controller: _weightController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Weight ≤'),
-                onSubmitted: (_) => _applyFilters(),
+              SizedBox(
+                width: 140,
+                height: AppSizing.controlHeight,
+                child: TextField(
+                  controller: _qtyController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    hintText: 'Qty ≤',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  onSubmitted: (_) => _applyFilters(),
+                ),
               ),
-            ),
+              SizedBox(
+                width: 160,
+                height: AppSizing.controlHeight,
+                child: TextField(
+                  controller: _weightController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    hintText: 'Wt ≤ (kg)',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  onSubmitted: (_) => _applyFilters(),
+                ),
+              ),
+              FilledButton(onPressed: _applyFilters, child: const Text('Search')),
+              OutlinedButton(onPressed: _resetFilters, child: const Text('Reset')),
+            ],
           ),
-          const SizedBox(width: AppSpacing.x16),
-          FilledButton(
-              onPressed: _applyFilters, child: const Text('Search')),
-          const SizedBox(width: AppSpacing.x8),
-          OutlinedButton(
-              onPressed: _resetFilters, child: const Text('Reset')),
-        ],
-      ),
+        ),
+        const SizedBox(width: AppSpacing.x8),
+        // Actions section (right)
+        OutlinedButton(
+          onPressed: () => context.go('/bulk'),
+          child: const Text('Bulk Update'),
+        ),
+      ],
     );
   }
 }

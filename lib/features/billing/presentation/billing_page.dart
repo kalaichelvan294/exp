@@ -6,9 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../app/module_scaffold.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../shared/widgets/app_card.dart';
 import '../application/billing_controller.dart';
 import '../domain/money.dart';
-import 'widgets/app_card.dart';
 import 'widgets/billing_search_field.dart';
 import 'widgets/cart_table.dart';
 import 'widgets/checkout_panel.dart';
@@ -62,7 +62,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final state = ref.read(billingControllerProvider);
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    final alt = keys.contains(LogicalKeyboardKey.altLeft) ||
+    final alt =
+        keys.contains(LogicalKeyboardKey.altLeft) ||
         keys.contains(LogicalKeyboardKey.altRight);
 
     if (event.logicalKey == LogicalKeyboardKey.escape && state.previewVisible) {
@@ -107,12 +108,9 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final previewVisible =
-        ref.watch(billingControllerProvider.select((s) => s.previewVisible));
-    final isEditing =
-        ref.watch(billingControllerProvider.select((s) => s.isEditing));
-    final editingBillId =
-        ref.watch(billingControllerProvider.select((s) => s.editingBillId));
+    final previewVisible = ref.watch(
+      billingControllerProvider.select((s) => s.previewVisible),
+    );
 
     return Focus(
       autofocus: true,
@@ -120,41 +118,192 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       child: previewVisible
           ? const PreviewOverlay()
           : ModuleScaffold(
-              title: isEditing ? 'Edit Bill' : 'Sales Desk',
-              description: isEditing
-                  ? 'Editing bill $editingBillId. Update and press F4 to save.'
-                  : 'Search products, build the cart, and check out.',
-              actions: const [_HeaderActions()],
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const _HeldBillsBar(),
                   const SizedBox(height: AppSpacing.x16),
                   Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: AppCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                BillingSearchField(focusNode: _searchFocus),
-                                const SizedBox(height: AppSpacing.x16),
-                                const Expanded(child: CartTable()),
-                              ],
+                    child: AppCard(
+                      padding: EdgeInsets.zero,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.x20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  BillingSearchField(focusNode: _searchFocus),
+                                  const SizedBox(height: AppSpacing.x16),
+                                  Expanded(
+                                    child: CartTable(
+                                      onQtyConfirmed: _focusSearch,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.x20),
-                        const Expanded(flex: 1, child: CheckoutPanel()),
-                      ],
+                          const VerticalDivider(width: 1, thickness: 1),
+                          Expanded(
+                            flex: 1,
+                            child: Container(
+                              color: AppColors.neutral100,
+                              padding: const EdgeInsets.all(AppSpacing.x20),
+                              child: const CheckoutPanel(),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _HeldBillsBar extends ConsumerWidget {
+  const _HeldBillsBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final held = ref.watch(
+      billingControllerProvider.select((s) => s.heldBills),
+    );
+    final recent = ref.watch(
+      billingControllerProvider.select((s) => s.recentBills),
+    );
+    final holdsLeft = ref.watch(
+      billingControllerProvider.select((s) => s.holdsLeft),
+    );
+    final c = ref.read(billingControllerProvider.notifier);
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x4,
+        vertical: AppSpacing.x4,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.history,
+                      size: 16,
+                      color: AppColors.neutral500,
+                    ),
+                    const SizedBox(width: AppSpacing.x4),
+                    Text(
+                      'Recents:',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.neutral700,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.x8),
+                    if (recent.isEmpty)
+                      Text(
+                        'None',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.neutral500,
+                        ),
+                      )
+                    else
+                      Flexible(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (int i = 0; i < recent.length; i++) ...[
+                                _RecentChip(
+                                  label: recent[i].billId,
+                                  amount: Money.format(recent[i].amountPaise),
+                                  onTap: () =>
+                                      c.loadBillForEdit(recent[i].billId),
+                                ),
+                                if (i < recent.length - 1)
+                                  const SizedBox(width: AppSpacing.x6),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.x8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.pause_circle_outline,
+                      size: 16,
+                      color: AppColors.neutral500,
+                    ),
+                    const SizedBox(width: AppSpacing.x4),
+                    Text(
+                      'Hold:',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.neutral700,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.x8),
+                    if (held.isEmpty)
+                      Text(
+                        'None',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.neutral500,
+                        ),
+                      )
+                    else
+                      Flexible(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (int i = 0; i < held.length; i++) ...[
+                                _HeldChip(
+                                  label: held[i].label,
+                                  amount: Money.format(held[i].amountPaise),
+                                  onTap: () => c.resumeHeldBill(held[i].holdId),
+                                  onDelete: () =>
+                                      c.deleteHeldBill(held[i].holdId),
+                                ),
+                                if (i < held.length - 1)
+                                  const SizedBox(width: AppSpacing.x6),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: AppSpacing.x12),
+                    Text(
+                      'Holds left: $holdsLeft',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.neutral500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.x16),
+          const _HeaderActions(),
+        ],
+      ),
     );
   }
 }
@@ -169,6 +318,7 @@ class _HeaderActions extends ConsumerWidget {
 
     if (state.isEditing) {
       return Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           OutlinedButton.icon(
             onPressed: c.reprintCurrentBill,
@@ -198,6 +348,7 @@ class _HeaderActions extends ConsumerWidget {
     }
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         OutlinedButton.icon(
           onPressed: state.canHold ? c.holdCurrentBill : null,
@@ -243,46 +394,57 @@ class _HeaderActions extends ConsumerWidget {
   }
 }
 
-class _HeldBillsBar extends ConsumerWidget {
-  const _HeldBillsBar();
+class _RecentChip extends StatelessWidget {
+  const _RecentChip({
+    required this.label,
+    required this.amount,
+    required this.onTap,
+  });
+
+  final String label;
+  final String amount;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final held = ref.watch(billingControllerProvider.select((s) => s.heldBills));
-    final holdsLeft =
-        ref.watch(billingControllerProvider.select((s) => s.holdsLeft));
-    final c = ref.read(billingControllerProvider.notifier);
-    final theme = Theme.of(context);
-
-    return AppCard(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.x16, vertical: AppSpacing.x8),
-      child: Row(
-        children: [
-          const Icon(Icons.pause_circle_outline,
-              size: 18, color: AppColors.neutral500),
-          const SizedBox(width: AppSpacing.x8),
-          Text('Hold', style: theme.textTheme.bodySmall),
-          const SizedBox(width: AppSpacing.x16),
-          Expanded(
-            child: held.isEmpty
-                ? Text('No held bills', style: theme.textTheme.bodySmall)
-                : Wrap(
-                    spacing: AppSpacing.x8,
-                    runSpacing: AppSpacing.x8,
-                    children: held
-                        .map((chip) => _HeldChip(
-                              label: chip.label,
-                              amount: Money.format(chip.amountPaise),
-                              onTap: () => c.resumeHeldBill(chip.holdId),
-                              onDelete: () => c.deleteHeldBill(chip.holdId),
-                            ))
-                        .toList(),
-                  ),
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.neutral100,
+      borderRadius: BorderRadius.circular(AppRadius.small),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.small),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.x8,
+            vertical: AppSpacing.x4,
           ),
-          const SizedBox(width: AppSpacing.x16),
-          Text('Holds left: $holdsLeft', style: theme.textTheme.bodySmall),
-        ],
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.neutral300, width: 1),
+            borderRadius: BorderRadius.circular(AppRadius.small),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.primary600,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.x6),
+              Text(
+                amount,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.neutral800,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -305,40 +467,61 @@ class _HeldChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.neutral100,
-      borderRadius: AppRadius.input,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            onTap: onTap,
-            borderRadius: AppRadius.input,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.x8, vertical: AppSpacing.x4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(label,
+      borderRadius: BorderRadius.circular(AppRadius.small),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.neutral300, width: 1),
+          borderRadius: BorderRadius.circular(AppRadius.small),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(AppRadius.small),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x8,
+                  vertical: AppSpacing.x4,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.neutral700,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(width: AppSpacing.x8),
-                  Text(amount, style: Theme.of(context).textTheme.bodySmall),
-                ],
+                        color: AppColors.neutral800,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.x6),
+                    Text(
+                      amount,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.neutral800,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          InkWell(
-            onTap: onDelete,
-            borderRadius: AppRadius.input,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.x4, vertical: AppSpacing.x4),
-              child: Icon(Icons.close, size: 14, color: AppColors.neutral500),
+            InkWell(
+              onTap: onDelete,
+              borderRadius: BorderRadius.circular(AppRadius.small),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x4,
+                  vertical: AppSpacing.x4,
+                ),
+                child: Icon(Icons.close, size: 14, color: AppColors.neutral500),
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.x4),
-        ],
+            const SizedBox(width: AppSpacing.x4),
+          ],
+        ),
       ),
     );
   }

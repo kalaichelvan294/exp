@@ -1,15 +1,6 @@
 import '../../billing/domain/bill_data.dart';
 import '../../settings/domain/app_settings.dart';
 
-/// Default store profile, mirroring `normalizeBill` in the Electron
-/// `receipt-printer.js`. Used when a settings value is blank so the receipt
-/// still renders a complete header.
-class ReceiptStoreDefaults {
-  static const storeName = 'Sri Perumal Chips and Snacks';
-  static const businessType = 'Wholesale & Retail';
-  static const address = 'No 49, Valmikki st, Thiruvanmiyur, Chennai 41';
-}
-
 /// A single printed receipt line. Mirrors the row shape consumed by
 /// `buildReceiptHtml` (qty, rate in paise, line total in paise, sku, names).
 class ReceiptItem {

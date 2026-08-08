@@ -17,9 +17,21 @@ class BillingMessage {
 /// A held-bill chip rendered on the Sales Desk.
 @immutable
 class HeldBillChip {
-  const HeldBillChip({required this.holdId, required this.label, required this.amountPaise});
+  const HeldBillChip({
+    required this.holdId,
+    required this.label,
+    required this.amountPaise,
+  });
   final String holdId;
   final String label;
+  final int amountPaise;
+}
+
+/// A recent-bill chip rendered on the Sales Desk.
+@immutable
+class RecentBillChip {
+  const RecentBillChip({required this.billId, required this.amountPaise});
+  final String billId;
   final int amountPaise;
 }
 
@@ -33,6 +45,7 @@ class BillingState {
     this.searchDropdownOpen = false,
     this.cart = const [],
     this.selectedCartIndex = -1,
+    this.qtyFocusRequestToken = 0,
     this.paymentMode = PaymentMode.cash,
     this.discountMode = DiscountMode.percent,
     this.discountValue = 0,
@@ -42,6 +55,7 @@ class BillingState {
     this.wholesaleAutoApply = true,
     this.previewVisible = false,
     this.heldBills = const [],
+    this.recentBills = const [],
     this.holdsLeft = 3,
     this.message = BillingMessage.empty,
     this.searching = false,
@@ -55,6 +69,7 @@ class BillingState {
 
   final List<CartLine> cart;
   final int selectedCartIndex;
+  final int qtyFocusRequestToken;
 
   final PaymentMode paymentMode;
   final DiscountMode discountMode;
@@ -72,6 +87,7 @@ class BillingState {
 
   final bool previewVisible;
   final List<HeldBillChip> heldBills;
+  final List<RecentBillChip> recentBills;
   final int holdsLeft;
 
   final BillingMessage message;
@@ -81,6 +97,13 @@ class BillingState {
   bool get cartEmpty => cart.isEmpty;
   bool get canCheckout => cart.isNotEmpty && !submitting;
   bool get canHold => cart.isNotEmpty && !previewVisible && !submitting;
+  bool get hasMergeableDuplicates {
+    final seen = <String>{};
+    for (final line in cart) {
+      if (!seen.add(line.mergeKey)) return true;
+    }
+    return false;
+  }
 
   /// True when an existing saved bill is loaded for editing.
   bool get isEditing => editingBillId.trim().isNotEmpty;
@@ -92,6 +115,7 @@ class BillingState {
     bool? searchDropdownOpen,
     List<CartLine>? cart,
     int? selectedCartIndex,
+    int? qtyFocusRequestToken,
     PaymentMode? paymentMode,
     DiscountMode? discountMode,
     num? discountValue,
@@ -101,6 +125,7 @@ class BillingState {
     bool? wholesaleAutoApply,
     bool? previewVisible,
     List<HeldBillChip>? heldBills,
+    List<RecentBillChip>? recentBills,
     int? holdsLeft,
     BillingMessage? message,
     bool? searching,
@@ -113,6 +138,7 @@ class BillingState {
       searchDropdownOpen: searchDropdownOpen ?? this.searchDropdownOpen,
       cart: cart ?? this.cart,
       selectedCartIndex: selectedCartIndex ?? this.selectedCartIndex,
+      qtyFocusRequestToken: qtyFocusRequestToken ?? this.qtyFocusRequestToken,
       paymentMode: paymentMode ?? this.paymentMode,
       discountMode: discountMode ?? this.discountMode,
       discountValue: discountValue ?? this.discountValue,
@@ -122,6 +148,7 @@ class BillingState {
       wholesaleAutoApply: wholesaleAutoApply ?? this.wholesaleAutoApply,
       previewVisible: previewVisible ?? this.previewVisible,
       heldBills: heldBills ?? this.heldBills,
+      recentBills: recentBills ?? this.recentBills,
       holdsLeft: holdsLeft ?? this.holdsLeft,
       message: message ?? this.message,
       searching: searching ?? this.searching,

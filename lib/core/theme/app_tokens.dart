@@ -38,7 +38,9 @@ class AppSpacing {
   AppSpacing._();
 
   static const double x4 = 4;
+  static const double x6 = 6;
   static const double x8 = 8;
+  static const double x12 = 12;
   static const double x16 = 16;
   static const double x20 = 20;
   static const double x24 = 24;
@@ -53,9 +55,9 @@ class AppSpacing {
 class AppRadius {
   AppRadius._();
 
-  static const double small = 6;
-  static const double medium = 8;
-  static const double large = 12;
+  static const double small = 4;
+  static const double medium = 6;
+  static const double large = 6;
 
   static const BorderRadius input = BorderRadius.all(Radius.circular(medium));
   static const BorderRadius button = BorderRadius.all(Radius.circular(medium));

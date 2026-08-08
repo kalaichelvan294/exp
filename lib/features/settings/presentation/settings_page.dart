@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/module_scaffold.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../shared/widgets/section_card.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../billing/domain/billing_enums.dart';
-import '../../billing/presentation/widgets/app_card.dart';
+import '../../../shared/widgets/app_card.dart';
 import '../application/settings_controller.dart';
 import '../application/settings_state.dart';
 
@@ -27,13 +29,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _upiDisplayName = TextEditingController();
   final _categoryInput = TextEditingController();
   final _brandInput = TextEditingController();
+  final _itemImagesRootPath = TextEditingController();
 
   String _printLanguage = 'en';
   String _uiSizeVariant = 'md';
   String _themeMode = 'light';
+  int _adminTimeoutSeconds = 300;
   bool _invEnabled = false;
   bool _wholesaleAutoApply = true;
   final Set<PaymentMode> _paymentModes = {};
+  _SettingsSection _activeSection = _SettingsSection.storeProfile;
+  bool _adminTimeoutDirty = false;
   bool _synced = false;
 
   @override
@@ -46,11 +52,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _upiDisplayName.dispose();
     _categoryInput.dispose();
     _brandInput.dispose();
+    _itemImagesRootPath.dispose();
     super.dispose();
   }
 
-  SettingsController get _c =>
-      ref.read(settingsControllerProvider.notifier);
+  SettingsController get _c => ref.read(settingsControllerProvider.notifier);
 
   void _syncFromState(SettingsState state) {
     final s = state.settings;
@@ -65,52 +71,117 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _themeMode = s.themeMode;
     _invEnabled = state.invControlEnabled;
     _wholesaleAutoApply = s.itemsWholesaleAutoApply;
+    _itemImagesRootPath.text = s.itemImagesRootPath;
     _paymentModes
       ..clear()
       ..addAll(s.billingPaymentModes);
   }
 
+  int _normalizeTimeoutSeconds(int value) {
+    if (value < 30) return 30;
+    return value;
+  }
+
+  Color _toastColor(SettingsMessage message) {
+    if (message.isError) return AppColors.error500;
+    if (message.isSuccess) return AppColors.success500;
+    return AppColors.neutral700;
+  }
+
+  void _showToast(SettingsMessage message) {
+    if (message.isEmpty || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message.text),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _toastColor(message),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(settingsControllerProvider);
+    final authState = ref.watch(authControllerProvider);
+    ref.listen<SettingsMessage>(
+      settingsControllerProvider.select((s) => s.message),
+      (previous, next) {
+        if (next.isEmpty) return;
+        if (previous != null &&
+            previous.text == next.text &&
+            previous.type == next.type) {
+          return;
+        }
+        _showToast(next);
+      },
+    );
     if (state.loaded && !_synced) {
       _synced = true;
       _syncFromState(state);
     }
+    if (!_adminTimeoutDirty) {
+      _adminTimeoutSeconds = _normalizeTimeoutSeconds(
+        authState.timeout.inSeconds,
+      );
+    }
 
     return ModuleScaffold(
-      title: 'Settings',
-      description:
-          'Store profile, receipt, payment, inventory, and appearance settings.',
       child: !state.loaded
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!state.message.isEmpty) _MessageBanner(message: state.message),
-                  _storeProfileCard(),
-                  const SizedBox(height: AppSpacing.x16),
-                  _printCard(),
-                  const SizedBox(height: AppSpacing.x16),
-                  _upiCard(),
-                  const SizedBox(height: AppSpacing.x16),
-                  _paymentCard(),
-                  const SizedBox(height: AppSpacing.x16),
-                  _appearanceCard(),
-                  const SizedBox(height: AppSpacing.x16),
-                  _inventoryCard(),
-                  const SizedBox(height: AppSpacing.x16),
-                  _itemConfigCard(state),
-                ],
-              ),
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 240,
+                  child: _SettingsNav(
+                    active: _activeSection,
+                    onSelected: (section) => setState(() {
+                      _activeSection = section;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.x16),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [_activeSectionCard(state)],
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }
 
+  Widget _activeSectionCard(SettingsState state) {
+    switch (_activeSection) {
+      case _SettingsSection.storeProfile:
+        return _storeProfileCard();
+      case _SettingsSection.printLanguage:
+        return _printCard();
+      case _SettingsSection.upiPayment:
+        return _upiCard();
+      case _SettingsSection.paymentOptions:
+        return _paymentCard();
+      case _SettingsSection.appearance:
+        return _appearanceCard();
+      case _SettingsSection.adminSession:
+        return _adminSessionCard();
+      case _SettingsSection.inventoryControl:
+        return _inventoryCard();
+      case _SettingsSection.itemConfiguration:
+        return _itemConfigCard(state);
+      case _SettingsSection.helpAndShortcuts:
+        return _helpAndShortcutsCard();
+    }
+  }
+
   // ── Store profile ─────────────────────────────────────────────────────────
   Widget _storeProfileCard() {
-    return _SectionCard(
+    return SectionCard(
       title: 'Store Profile',
       onReset: () {
         _c.clearMessage();
@@ -123,22 +194,62 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         fssaiNumber: _fssai.text,
       ),
       children: [
-        _field('Store Name', _storeName),
-        _field('Business Type', _businessType),
-        _field('Store Address', _storeAddress),
-        _field('FSSAI Number', _fssai),
+        _field(
+          'Store Name',
+          _storeName,
+          onChanged: (_) => _c.previewStoreProfile(
+            storeName: _storeName.text,
+            businessType: _businessType.text,
+            storeAddress: _storeAddress.text,
+            fssaiNumber: _fssai.text,
+          ),
+        ),
+        _field(
+          'Business Type',
+          _businessType,
+          onChanged: (_) => _c.previewStoreProfile(
+            storeName: _storeName.text,
+            businessType: _businessType.text,
+            storeAddress: _storeAddress.text,
+            fssaiNumber: _fssai.text,
+          ),
+        ),
+        _field(
+          'Store Address',
+          _storeAddress,
+          onChanged: (_) => _c.previewStoreProfile(
+            storeName: _storeName.text,
+            businessType: _businessType.text,
+            storeAddress: _storeAddress.text,
+            fssaiNumber: _fssai.text,
+          ),
+        ),
+        _field(
+          'FSSAI Number',
+          _fssai,
+          onChanged: (_) => _c.previewStoreProfile(
+            storeName: _storeName.text,
+            businessType: _businessType.text,
+            storeAddress: _storeAddress.text,
+            fssaiNumber: _fssai.text,
+          ),
+        ),
       ],
     );
   }
 
   // ── Print language ────────────────────────────────────────────────────────
   Widget _printCard() {
-    return _SectionCard(
+    return SectionCard(
       title: 'Print Language',
       onReset: () {
         _c.clearMessage();
-        setState(() => _printLanguage =
-            ref.read(settingsControllerProvider).settings.printLanguage);
+        setState(
+          () => _printLanguage = ref
+              .read(settingsControllerProvider)
+              .settings
+              .printLanguage,
+        );
       },
       onSave: () => _c.savePrintLanguage(_printLanguage),
       children: [
@@ -152,7 +263,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               DropdownMenuItem(value: 'en', child: Text('English')),
               DropdownMenuItem(value: 'ta', child: Text('Tamil (தமிழ்)')),
             ],
-            onChanged: (v) => setState(() => _printLanguage = v ?? 'en'),
+            onChanged: (v) {
+              final next = v ?? 'en';
+              setState(() => _printLanguage = next);
+              _c.previewPrintLanguage(next);
+            },
           ),
         ),
       ],
@@ -161,7 +276,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   // ── UPI ───────────────────────────────────────────────────────────────────
   Widget _upiCard() {
-    return _SectionCard(
+    return SectionCard(
       title: 'UPI Payment',
       onReset: () {
         _c.clearMessage();
@@ -171,13 +286,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _upiDisplayName.text = s.upiDisplayName;
         });
       },
-      onSave: () => _c.saveUpi(
-        upiId: _upiId.text,
-        displayName: _upiDisplayName.text,
-      ),
+      onSave: () =>
+          _c.saveUpi(upiId: _upiId.text, displayName: _upiDisplayName.text),
       children: [
-        _field('UPI ID', _upiId),
-        _field('Display Name', _upiDisplayName),
+        _field(
+          'UPI ID',
+          _upiId,
+          onChanged: (_) => _c.previewUpi(
+            upiId: _upiId.text,
+            displayName: _upiDisplayName.text,
+          ),
+        ),
+        _field(
+          'Display Name',
+          _upiDisplayName,
+          onChanged: (_) => _c.previewUpi(
+            upiId: _upiId.text,
+            displayName: _upiDisplayName.text,
+          ),
+        ),
       ],
     );
   }
@@ -199,22 +326,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             } else {
               _paymentModes.remove(mode);
             }
+            _c.previewPaymentModes(_paymentModes.toList());
           }),
         ),
       );
     }
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Payment Options',
       onReset: () {
         _c.clearMessage();
         setState(() {
           _paymentModes
             ..clear()
-            ..addAll(ref
-                .read(settingsControllerProvider)
-                .settings
-                .billingPaymentModes);
+            ..addAll(
+              ref.read(settingsControllerProvider).settings.billingPaymentModes,
+            );
         });
       },
       onSave: () => _c.savePaymentModes(_paymentModes.toList()),
@@ -228,7 +355,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   // ── Appearance ────────────────────────────────────────────────────────────
   Widget _appearanceCard() {
-    return _SectionCard(
+    return SectionCard(
       title: 'Appearance',
       onReset: () {
         _c.clearMessage();
@@ -257,7 +384,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               DropdownMenuItem(value: 'xl', child: Text('Extra Large')),
               DropdownMenuItem(value: 'xxl', child: Text('Maximum Large')),
             ],
-            onChanged: (v) => setState(() => _uiSizeVariant = v ?? 'md'),
+            onChanged: (v) {
+              final next = v ?? 'md';
+              setState(() => _uiSizeVariant = next);
+              _c.previewAppearance(
+                themeMode: _themeMode,
+                uiSizeVariant: next,
+              );
+            },
           ),
         ),
         SizedBox(
@@ -270,17 +404,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(
-                      value: 'light',
-                      label: Text('Light'),
-                      icon: Icon(Icons.light_mode, size: 16)),
+                    value: 'light',
+                    label: Text('Light'),
+                    icon: Icon(Icons.light_mode, size: 16),
+                  ),
                   ButtonSegment(
-                      value: 'dark',
-                      label: Text('Dark'),
-                      icon: Icon(Icons.dark_mode, size: 16)),
+                    value: 'dark',
+                    label: Text('Dark'),
+                    icon: Icon(Icons.dark_mode, size: 16),
+                  ),
                 ],
                 selected: {_themeMode},
-                onSelectionChanged: (s) =>
-                    setState(() => _themeMode = s.first),
+                onSelectionChanged: (s) {
+                  final next = s.first;
+                  setState(() => _themeMode = next);
+                  _c.previewAppearance(
+                    themeMode: next,
+                    uiSizeVariant: _uiSizeVariant,
+                  );
+                },
               ),
             ],
           ),
@@ -289,14 +431,93 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  // ── Admin session ──────────────────────────────────────────────────────────
+  Widget _adminSessionCard() {
+    final timeoutOptions = <int>[
+      30,
+      60,
+      120,
+      180,
+      300,
+      600,
+      900,
+      1200,
+      1800,
+      2700,
+      3600,
+    ];
+    if (!timeoutOptions.contains(_adminTimeoutSeconds)) {
+      timeoutOptions.add(_adminTimeoutSeconds);
+      timeoutOptions.sort();
+    }
+    String labelFor(int seconds) {
+      if (seconds < 60) return '$seconds seconds';
+      final minutes = seconds ~/ 60;
+      return '$minutes minute${minutes == 1 ? '' : 's'}';
+    }
+
+    return SectionCard(
+      title: 'Admin Session',
+      onReset: () {
+        _c.clearMessage();
+        final current = ref.read(authControllerProvider).timeout.inSeconds;
+        setState(() {
+          _adminTimeoutDirty = false;
+          _adminTimeoutSeconds = _normalizeTimeoutSeconds(current);
+        });
+      },
+      onSave: () async {
+        try {
+          await ref
+              .read(authControllerProvider.notifier)
+              .setSessionTimeout(Duration(seconds: _adminTimeoutSeconds));
+          _c.showSuccess('Admin session timeout saved successfully!');
+          if (!mounted) return;
+          setState(() => _adminTimeoutDirty = false);
+        } catch (e) {
+          _c.showError('Failed to save admin session timeout: $e');
+        }
+      },
+      children: [
+        SizedBox(
+          width: 260,
+          child: DropdownButtonFormField<int>(
+            key: ValueKey(_adminTimeoutSeconds),
+            initialValue: _adminTimeoutSeconds,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Auto-logout timeout'),
+            items: timeoutOptions
+                .map(
+                  (seconds) => DropdownMenuItem<int>(
+                    value: seconds,
+                    child: Text(labelFor(seconds)),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _adminTimeoutDirty = true;
+                _adminTimeoutSeconds = value;
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── Inventory control ─────────────────────────────────────────────────────
   Widget _inventoryCard() {
-    return _SectionCard(
+    return SectionCard(
       title: 'Inventory Control',
       onReset: () {
         _c.clearMessage();
-        setState(() => _invEnabled =
-            ref.read(settingsControllerProvider).invControlEnabled);
+        setState(
+          () => _invEnabled = ref
+              .read(settingsControllerProvider)
+              .invControlEnabled,
+        );
       },
       onSave: () => _c.saveInventoryControl(_invEnabled),
       children: [
@@ -307,7 +528,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             dense: true,
             title: const Text('Enable inventory tracking'),
             value: _invEnabled,
-            onChanged: (v) => setState(() => _invEnabled = v),
+            onChanged: (v) => setState(() {
+              _invEnabled = v;
+              _c.previewInventoryControl(v);
+            }),
           ),
         ),
       ],
@@ -316,18 +540,46 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   // ── Item configuration ────────────────────────────────────────────────────
   Widget _itemConfigCard(SettingsState state) {
-    return _SectionCard(
+    return SectionCard(
       title: 'Item Configuration',
       onReset: () {
         _c.clearMessage();
         _c.resetItemConfig();
-        setState(() => _wholesaleAutoApply =
-            ref.read(settingsControllerProvider).settings.itemsWholesaleAutoApply);
+        setState(() {
+          final settings = ref.read(settingsControllerProvider).settings;
+          _wholesaleAutoApply = settings.itemsWholesaleAutoApply;
+          _itemImagesRootPath.text = settings.itemImagesRootPath;
+        });
       },
-      onSave: () => _c.saveItemConfig(wholesaleAutoApply: _wholesaleAutoApply),
+      onSave: () => _c.saveItemConfig(
+        wholesaleAutoApply: _wholesaleAutoApply,
+        itemImagesRootPath: _itemImagesRootPath.text,
+      ),
       childrenAlignment: CrossAxisAlignment.stretch,
       fullWidthChildren: true,
       children: [
+        SizedBox(
+          width: 560,
+          child: TextField(
+            controller: _itemImagesRootPath,
+            decoration: const InputDecoration(
+              labelText: 'Item Images Root Path',
+              hintText: r'e.g. C:\POS\images or http://localhost:3000/images',
+            ),
+            onChanged: (_) => _c.previewItemConfig(
+              wholesaleAutoApply: _wholesaleAutoApply,
+              itemImagesRootPath: _itemImagesRootPath.text,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.x6),
+        Text(
+          'Images are saved as <SKU>_master.jpg and loaded from this root.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.neutral500),
+        ),
+        const SizedBox(height: AppSpacing.x20),
         Text('Categories', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.x8),
         Row(
@@ -335,8 +587,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Expanded(
               child: TextField(
                 controller: _categoryInput,
-                decoration:
-                    const InputDecoration(hintText: 'Add category (e.g. GROCERY)'),
+                decoration: const InputDecoration(
+                  hintText: 'Add category (e.g. GROCERY)',
+                ),
                 onSubmitted: (v) {
                   _c.addCategory(v);
                   _categoryInput.clear();
@@ -364,8 +617,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         Row(
           children: [
             Expanded(
-                child: Text('Brands',
-                    style: Theme.of(context).textTheme.titleMedium)),
+              child: Text(
+                'Brands',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
             OutlinedButton.icon(
               onPressed: _c.propagateBrands,
               icon: const Icon(Icons.sync, size: 16),
@@ -379,8 +635,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Expanded(
               child: TextField(
                 controller: _brandInput,
-                decoration:
-                    const InputDecoration(hintText: 'Add brand (e.g. ACME)'),
+                decoration: const InputDecoration(
+                  hintText: 'Add brand (e.g. ACME)',
+                ),
                 onSubmitted: (v) {
                   _c.addBrand(v);
                   _brandInput.clear();
@@ -409,92 +666,253 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           dense: true,
           title: const Text('Auto-apply wholesale pricing'),
           value: _wholesaleAutoApply,
-          onChanged: (v) => setState(() => _wholesaleAutoApply = v),
+          onChanged: (v) => setState(() {
+            _wholesaleAutoApply = v;
+            _c.previewItemConfig(
+              wholesaleAutoApply: v,
+              itemImagesRootPath: _itemImagesRootPath.text,
+            );
+          }),
         ),
       ],
     );
   }
 
-  Widget _field(String label, TextEditingController controller) {
+  Widget _field(
+    String label,
+    TextEditingController controller, {
+    ValueChanged<String>? onChanged,
+  }) {
     return SizedBox(
       width: 320,
       child: TextField(
         controller: controller,
         decoration: InputDecoration(labelText: label),
+        onChanged: onChanged,
       ),
     );
   }
-}
 
-class _MessageBanner extends StatelessWidget {
-  const _MessageBanner({required this.message});
-  final SettingsMessage message;
+  Widget _helpAndShortcutsCard() {
+    return SectionCard(
+      title: 'Help & Shortcuts',
+      onSave: () {},
+      onReset: () {},
+      fullWidthChildren: true,
+      showActions: false,
+      childrenAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Settings Page Help',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: AppSpacing.x8),
+        Text(
+          'Use the left-side navigation to move between sections. '
+          'Each section saves independently. Reset restores the section '
+          'to the last saved values.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: AppSpacing.x12),
+        const Text('Store Profile: Store Name, Business Type, Store Address, and FSSAI Number.'),
+        const Text('Print Language: Choose receipt language (English or Tamil).'),
+        const Text('UPI Payment: Configure UPI ID and display name.'),
+        const Text('Payment Options: Enable Cash, GPay, and/or Card (at least one mode).'),
+        const Text('Appearance: Set UI size and Light/Dark theme.'),
+        const Text('Admin Session: Configure admin auto-logout timeout.'),
+        const Text('Inventory Control: Toggle inventory tracking.'),
+        const Text(
+          'Item Configuration: Manage image root path, categories, brands, '
+          'brand propagation, and wholesale auto-apply. '
+          'Item images follow <SKU>_master.jpg (JPG/JPEG).',
+        ),
+        const SizedBox(height: AppSpacing.x20),
+        Text(
+          'Keyboard Shortcuts',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: AppSpacing.x8),
+        _shortcutTable(),
+      ],
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final color = message.isError
-        ? AppColors.error500
-        : message.isSuccess
-            ? AppColors.success500
-            : AppColors.neutral500;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.x16),
-      child: Text(message.text,
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: color, fontWeight: FontWeight.w600)),
+  Widget _shortcutTable() {
+    const shortcuts = <_ShortcutItem>[
+      _ShortcutItem('F2', 'Global', 'Go to Sales Desk'),
+      _ShortcutItem('F3', 'Global', 'Go to Items'),
+      _ShortcutItem('F10', 'Global', 'Go to Settings'),
+      _ShortcutItem('/', 'Global', 'Focus Sales Desk search'),
+      _ShortcutItem('Ctrl+Enter', 'Global', 'Checkout current bill'),
+      _ShortcutItem('Ctrl+H', 'Global', 'Hold current bill'),
+      _ShortcutItem('Esc', 'Global', 'Cancel / close current context'),
+      _ShortcutItem('Alt+S', 'Sales Desk', 'Focus search'),
+      _ShortcutItem('Alt+N', 'Sales Desk', 'Start new bill'),
+      _ShortcutItem('Alt+H', 'Sales Desk', 'Hold current bill'),
+      _ShortcutItem('Alt+P', 'Sales Desk', 'Open preview'),
+      _ShortcutItem('F4', 'Sales Desk', 'Open preview or Save & Print'),
+      _ShortcutItem('Delete', 'Sales Desk', 'Remove selected cart row'),
+      _ShortcutItem('Arrow Up/Down/Left/Right', 'Sales Desk Search', 'Move selection in search grid'),
+      _ShortcutItem('Enter', 'Sales Desk Search', 'Add selected item'),
+      _ShortcutItem('Enter', 'Cart Qty/Weight', 'Confirm qty and return focus to search'),
+      _ShortcutItem('Esc', 'Sales Desk Search', 'Close search dropdown'),
+      _ShortcutItem('Alt+C', 'Bills', 'Return to Sales Desk'),
+    ];
+
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(2),
+        1: FlexColumnWidth(2),
+        2: FlexColumnWidth(5),
+      },
+      border: TableBorder.all(color: AppColors.neutral200),
+      children: [
+        const TableRow(
+          decoration: BoxDecoration(color: AppColors.neutral100),
+          children: [
+            Padding(
+              padding: EdgeInsets.all(AppSpacing.x8),
+              child: Text('Shortcut', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+            Padding(
+              padding: EdgeInsets.all(AppSpacing.x8),
+              child: Text('Scope', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+            Padding(
+              padding: EdgeInsets.all(AppSpacing.x8),
+              child: Text('Action', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+        for (final item in shortcuts)
+          TableRow(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.x8),
+                child: Text(item.shortcut),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.x8),
+                child: Text(item.scope),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.x8),
+                child: Text(item.action),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.children,
-    required this.onSave,
-    required this.onReset,
-    this.childrenAlignment = CrossAxisAlignment.start,
-    this.fullWidthChildren = false,
-  });
+enum _SettingsSection {
+  storeProfile,
+  printLanguage,
+  upiPayment,
+  paymentOptions,
+  appearance,
+  adminSession,
+  inventoryControl,
+  itemConfiguration,
+  helpAndShortcuts,
+}
 
-  final String title;
-  final List<Widget> children;
-  final VoidCallback onSave;
-  final VoidCallback onReset;
-  final CrossAxisAlignment childrenAlignment;
-  final bool fullWidthChildren;
+class _SettingsNav extends StatelessWidget {
+  const _SettingsNav({required this.active, required this.onSelected});
+
+  final _SettingsSection active;
+  final ValueChanged<_SettingsSection> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(title, style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.x16),
-          if (fullWidthChildren)
-            Column(crossAxisAlignment: childrenAlignment, children: children)
-          else
-            Wrap(
-              spacing: AppSpacing.x16,
-              runSpacing: AppSpacing.x16,
-              children: children,
+          Text('Settings', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.x12),
+          for (final item in _navItems) ...[
+            _SettingsNavItem(
+              label: item.label,
+              selected: active == item.section,
+              onTap: () => onSelected(item.section),
             ),
-          const SizedBox(height: AppSpacing.x16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton(onPressed: onReset, child: const Text('Reset')),
-              const SizedBox(width: AppSpacing.x8),
-              FilledButton(onPressed: onSave, child: const Text('Save')),
-            ],
-          ),
+            const SizedBox(height: AppSpacing.x8),
+          ],
         ],
       ),
     );
   }
+}
+
+class _NavItemData {
+  const _NavItemData(this.section, this.label);
+  final _SettingsSection section;
+  final String label;
+}
+
+const List<_NavItemData> _navItems = [
+  _NavItemData(_SettingsSection.storeProfile, 'Store Profile'),
+  _NavItemData(_SettingsSection.printLanguage, 'Print Language'),
+  _NavItemData(_SettingsSection.upiPayment, 'UPI Payment'),
+  _NavItemData(_SettingsSection.paymentOptions, 'Payment Options'),
+  _NavItemData(_SettingsSection.appearance, 'Appearance'),
+  _NavItemData(_SettingsSection.adminSession, 'Admin Session'),
+  _NavItemData(_SettingsSection.inventoryControl, 'Inventory Control'),
+  _NavItemData(_SettingsSection.itemConfiguration, 'Item Configuration'),
+  _NavItemData(_SettingsSection.helpAndShortcuts, 'Help & Shortcuts'),
+];
+
+class _SettingsNavItem extends StatelessWidget {
+  const _SettingsNavItem({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected ? AppColors.primary500 : AppColors.neutral0;
+    final fg = selected ? AppColors.neutral0 : AppColors.neutral700;
+    final border = selected ? AppColors.primary500 : AppColors.neutral200;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(AppRadius.medium),
+      child: InkWell(
+        onTap: selected ? null : onTap,
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.x12,
+            vertical: AppSpacing.x8,
+          ),
+          decoration: BoxDecoration(
+            border: Border.all(color: border, width: 1),
+            borderRadius: BorderRadius.circular(AppRadius.medium),
+          ),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShortcutItem {
+  const _ShortcutItem(this.shortcut, this.scope, this.action);
+  final String shortcut;
+  final String scope;
+  final String action;
 }
 
 class _ChipWrap extends StatelessWidget {
@@ -515,21 +933,21 @@ class _ChipWrap extends StatelessWidget {
     final theme = Theme.of(context);
     final chips = <Widget>[];
     if (lockedFirst != null) {
-      chips.add(Chip(
-        label: Text(lockedFirst!),
-        avatar: const Icon(Icons.lock, size: 14),
-      ));
+      chips.add(
+        Chip(
+          label: Text(lockedFirst!),
+          avatar: const Icon(Icons.lock, size: 14),
+        ),
+      );
     }
     for (final item in items) {
-      chips.add(Chip(
-        label: Text(item),
-        onDeleted: () => onRemove(item),
-      ));
+      chips.add(Chip(label: Text(item), onDeleted: () => onRemove(item)));
     }
     if (chips.isEmpty) {
-      return Text(emptyText,
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: AppColors.neutral500));
+      return Text(
+        emptyText,
+        style: theme.textTheme.bodySmall?.copyWith(color: AppColors.neutral500),
+      );
     }
     return Wrap(
       spacing: AppSpacing.x8,

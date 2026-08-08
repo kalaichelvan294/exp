@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/module_scaffold.dart';
 import '../../../core/theme/app_tokens.dart';
-import '../../billing/presentation/widgets/app_card.dart';
+import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/app_tab_switcher.dart';
 import '../application/bulk_controller.dart';
 import '../application/bulk_state.dart';
 import '../domain/bulk_enums.dart';
@@ -36,8 +38,6 @@ class BulkPage extends ConsumerWidget {
     });
 
     return ModuleScaffold(
-      title: 'Bulk Ops',
-      description: 'Import/export items and inventory via XLSX templates.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -67,24 +67,21 @@ class _TabSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: SegmentedButton<BulkOperationType>(
-        segments: const [
-          ButtonSegment(
-            value: BulkOperationType.itemImport,
-            label: Text('Item Import'),
-            icon: Icon(Icons.inventory_2_outlined),
-          ),
-          ButtonSegment(
-            value: BulkOperationType.inventoryUpdate,
-            label: Text('Inventory Update'),
-            icon: Icon(Icons.warehouse_outlined),
-          ),
-        ],
-        selected: {current},
-        onSelectionChanged: (s) => onChanged(s.first),
-      ),
+    return AppTabSwitcher<BulkOperationType>(
+      selected: current,
+      onChanged: onChanged,
+      options: const [
+        AppTabOption(
+          value: BulkOperationType.itemImport,
+          label: 'Item Import',
+          icon: Icons.inventory_2_outlined,
+        ),
+        AppTabOption(
+          value: BulkOperationType.inventoryUpdate,
+          label: 'Inventory Update',
+          icon: Icons.warehouse_outlined,
+        ),
+      ],
     );
   }
 }
@@ -104,7 +101,7 @@ class _ItemImportTab extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionCard(
+        SectionCard(
           title: 'Download',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,7 +113,7 @@ class _ItemImportTab extends ConsumerWidget {
                   OutlinedButton.icon(
                     onPressed: controller.downloadItemTemplate,
                     icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text('Download Template'),
+                    label: const Text('Download Sample Template'),
                   ),
                   FilledButton.icon(
                     onPressed: controller.downloadItems,
@@ -189,7 +186,7 @@ class _InventoryUpdateTab extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionCard(
+        SectionCard(
           title: 'Download',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,7 +199,7 @@ class _InventoryUpdateTab extends ConsumerWidget {
                   OutlinedButton.icon(
                     onPressed: controller.downloadInventoryTemplate,
                     icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text('Download Template'),
+                    label: const Text('Download Sample Template'),
                   ),
                   SizedBox(
                     width: 180,
@@ -313,7 +310,7 @@ class _UploadCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(bulkControllerProvider.notifier);
-    return _SectionCard(
+    return SectionCard(
       title: 'Upload',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,7 +369,7 @@ class _PreviewCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final isItem = type == BulkOperationType.itemImport;
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Preview',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,7 +442,7 @@ class _ItemPreviewTable extends StatelessWidget {
         DataColumn(label: Text('Row')),
         DataColumn(label: Text('Sl.No')),
         DataColumn(label: Text('SKU')),
-        DataColumn(label: Text('Name')),
+        DataColumn(label: Text('Item Name')),
         DataColumn(label: Text('Operation')),
         DataColumn(label: Text('Status')),
         DataColumn(label: Text('Details')),
@@ -519,7 +516,7 @@ class _ResultCard extends ConsumerWidget {
     final isItem = type == BulkOperationType.itemImport;
     final rows = result.rows.take(50).toList();
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Result',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,7 +564,7 @@ class _ItemResultTable extends StatelessWidget {
         DataColumn(label: Text('Row')),
         DataColumn(label: Text('Sl.No')),
         DataColumn(label: Text('SKU')),
-        DataColumn(label: Text('Name')),
+        DataColumn(label: Text('Item Name')),
         DataColumn(label: Text('Operation')),
         DataColumn(label: Text('Outcome')),
         DataColumn(label: Text('Message')),
@@ -647,7 +644,7 @@ class _LastBatchCard extends ConsumerWidget {
       info = 'Applied: $applied · ${batch.rowCount} rows';
     }
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Last Batch',
       child: Row(
         children: [
@@ -695,27 +692,6 @@ class _LastBatchCard extends ConsumerWidget {
 }
 
 // ─── Shared building blocks ──────────────────────────────────────────────────
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.x16),
-          child,
-        ],
-      ),
-    );
-  }
-}
 
 class _ApplyingCard extends StatelessWidget {
   const _ApplyingCard();

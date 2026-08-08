@@ -1,0 +1,431 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "plugins/webview_windows/webview_windows_plugin.dll"
+		},
+		{
+			"path" : "plugins/webview_windows/webview_windows_plugin.lib"
+		},
+		{
+			"path" : "plugins/webview_windows/webview_windows_plugin.pdb"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"target_link_libraries",
+			"add_dependencies",
+			"target_compile_options",
+			"apply_standard_settings",
+			"target_compile_definitions",
+			"add_definitions",
+			"target_compile_features",
+			"target_sources"
+		],
+		"files" : 
+		[
+			"flutter/ephemeral/.plugin_symlinks/webview_windows/windows/CMakeLists.txt",
+			"flutter/CMakeLists.txt",
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 41,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 83,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 84,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 91,
+				"parent" : 0
+			},
+			{
+				"file" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 39,
+				"parent" : 5
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 40,
+				"parent" : 5
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 55,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 78,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 2,
+				"line" : 42,
+				"parent" : 9
+			},
+			{
+				"command" : 3,
+				"file" : 2,
+				"line" : 43,
+				"parent" : 9
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 86,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 60,
+				"parent" : 0
+			},
+			{
+				"file" : 2
+			},
+			{
+				"command" : 6,
+				"file" : 2,
+				"line" : 33,
+				"parent" : 14
+			},
+			{
+				"command" : 5,
+				"file" : 2,
+				"line" : 45,
+				"parent" : 9
+			},
+			{
+				"command" : 5,
+				"file" : 2,
+				"line" : 44,
+				"parent" : 9
+			},
+			{
+				"command" : 7,
+				"file" : 2,
+				"line" : 41,
+				"parent" : 9
+			},
+			{
+				"command" : 7,
+				"file" : 0,
+				"line" : 79,
+				"parent" : 0
+			},
+			{
+				"command" : 8,
+				"file" : 0,
+				"line" : 63,
+				"parent" : 0
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 10
+	},
+	"compileDependencies" : 
+	[
+		{
+			"backtrace" : 4,
+			"id" : "flutter::@2bb09fbb03a373b2cb34"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "flutter_wrapper_plugin::@2bb09fbb03a373b2cb34"
+		}
+	],
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "/DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++20"
+				},
+				{
+					"backtrace" : 8,
+					"fragment" : "/await"
+				},
+				{
+					"backtrace" : 10,
+					"fragment" : "/W4"
+				},
+				{
+					"backtrace" : 10,
+					"fragment" : "/WX"
+				},
+				{
+					"backtrace" : 10,
+					"fragment" : "/wd\\\"4100\\\""
+				},
+				{
+					"backtrace" : 11,
+					"fragment" : "/EHsc"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 12,
+					"define" : "FLUTTER_PLUGIN_IMPL"
+				},
+				{
+					"backtrace" : 13,
+					"define" : "HAVE_FLUTTER_D3D_TEXTURE"
+				},
+				{
+					"backtrace" : 15,
+					"define" : "UNICODE"
+				},
+				{
+					"backtrace" : 16,
+					"define" : "_DEBUG"
+				},
+				{
+					"backtrace" : 17,
+					"define" : "_HAS_EXCEPTIONS=0"
+				},
+				{
+					"backtrace" : 15,
+					"define" : "_UNICODE"
+				},
+				{
+					"define" : "webview_windows_plugin_EXPORTS"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 4,
+					"path" : "D:/IdeaProjects/pos_294_flutter/windows/flutter/ephemeral"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "D:/IdeaProjects/pos_294_flutter/windows/flutter/ephemeral/cpp_client_wrapper/include"
+				}
+			],
+			"language" : "CXX",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					18,
+					19
+				],
+				"standard" : "20"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10
+			]
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 4,
+			"id" : "flutter_wrapper_plugin::@2bb09fbb03a373b2cb34"
+		},
+		{
+			"backtrace" : 7,
+			"id" : "flutter_assemble::@2bb09fbb03a373b2cb34"
+		}
+	],
+	"id" : "webview_windows_plugin::@4eabb5beed6399285b2d",
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "/machine:x64 /debug /INCREMENTAL",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "packages\\Microsoft.Web.WebView2\\build\\native\\Microsoft.Web.WebView2.targets",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "packages\\Microsoft.Windows.ImplementationLibrary\\build\\native\\Microsoft.Windows.ImplementationLibrary.targets",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "flutter\\flutter_wrapper_plugin.lib",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 6,
+				"fragment" : "D:\\IdeaProjects\\pos_294_flutter\\windows\\flutter\\ephemeral\\flutter_windows.dll.lib",
+				"role" : "libraries"
+			},
+			{
+				"fragment" : "kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX"
+	},
+	"linkLibraries" : 
+	[
+		{
+			"backtrace" : 2,
+			"fragment" : "D:/IdeaProjects/pos_294_flutter/windows/out/build/x64-Debug/packages/Microsoft.Web.WebView2/build/native/Microsoft.Web.WebView2.targets"
+		},
+		{
+			"backtrace" : 3,
+			"fragment" : "D:/IdeaProjects/pos_294_flutter/windows/out/build/x64-Debug/packages/Microsoft.Windows.ImplementationLibrary/build/native/Microsoft.Windows.ImplementationLibrary.targets"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "flutter::@2bb09fbb03a373b2cb34"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "flutter_wrapper_plugin::@2bb09fbb03a373b2cb34"
+		}
+	],
+	"name" : "webview_windows_plugin",
+	"nameOnDisk" : "webview_windows_plugin.dll",
+	"paths" : 
+	{
+		"build" : "plugins/webview_windows",
+		"source" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/webview_windows_plugin.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/webview_platform.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/webview.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/webview_host.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/webview_bridge.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/texture_bridge.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/graphics_context.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/util/direct3d11.interop.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/util/rohelper.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/util/string_converter.cc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 20,
+			"compileGroupIndex" : 0,
+			"path" : "flutter/ephemeral/.plugin_symlinks/webview_windows/windows/texture_bridge_gpu.cc",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "SHARED_LIBRARY"
+}

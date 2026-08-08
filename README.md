@@ -1,19 +1,22 @@
 # pos_294_flutter
 
-Flutter **Windows desktop** migration of the existing Electron POS app
-(`pos-294`). This repository holds the Phase 1 foundation described in
-`../pos-294/specs/flutter-windows-migration-plan.md`.
+Flutter **Windows desktop** POS app (`pos-294`).
 
-## Locked decisions
+## Recent functionality updates
 
-- **Data access:** API bridge over HTTP; the bridge connects **directly to the
-  database**. The backend is chosen by configuration — **Postgres by default**,
-  SQLite as an alternative (mirrors the Electron `DB_CLIENT` setup).
-- **State management:** Riverpod.
-- **Migration style:** phase-by-phase with parity gates.
-- **Printing:** WebView-backed receipt preview/print (Phase 7).
+- Sales Desk search dropdown is now **image-card only** in a **3-column keyboard-navigable grid**.
+- Sales Desk search shortcut is now **`/`**.
+- Sales Desk add flow: Enter adds selected item, focus moves to qty/wt, next Enter confirms and returns focus to search.
+- Search cards now show item image, Tamil/English names, price per qty/kg, stock tag, and brand.
+- Reports page and route were removed.
+- Items add/edit modal redesigned with image-first layout and grouped fields.
+- Item image handling supports JPG only, saved as `<SKU>_master.jpg` to configurable root path from Settings.
+- Item images in Sales Desk and Items page now resolve using Settings image root path.
+- Brand display with fallback is shown in Sales Desk search cards and Items cards.
+- Reusable UI blocks were refactored into `lib/shared/widgets` (common `AppCard` and `SectionCard`).
+- Shared controls now include reusable button wrappers (`AppTextButton`, `AppTextIconButton`, `AppIconOnlyButton`) and a generic `AppTabSwitcher`.
 
-## Project layout
+## Project structure
 
 ```
 lib/
@@ -23,17 +26,86 @@ lib/
     router.dart                 go_router config (ShellRoute wraps all modules)
     app_routes.dart             Central module route registry
     app_shell.dart              Persistent top navigation + content area
+    navigation.dart             Navigation utilities
+    appearance.dart             Theme/appearance state (dark mode, font scale)
     module_scaffold.dart        Standard page layout + parity placeholder
   core/
     config/                     Environment variants + AppConfig bootstrap
-    theme/                      Design tokens + ThemeData (from ux-guidelines.md)
-    api/                        Typed API bridge client, endpoints, error mapper
-    logging/                    Diagnostics facade
+    database/                   PostgreSQL connection manager
+    images/                     Item image path resolution helpers
+    theme/                      Design tokens + ThemeData (Material Design)
+    logging/                    Logging facade
     shortcuts/                  Keyboard-first shortcut infrastructure
+  shared/
+    widgets/                    Reusable UI components used across modules
   features/
-    billing/  bills/  items/  inventory/  reports/  bulk/  settings/
-                                One presentation folder per migrated module
+    auth/                       Admin authentication + PIN protection
+    billing/                    Sales desk / POS billing module
+    bills/                      Bill history + hold/resume management
+    items/                      Item master data + SKU/image management
+    inventory/                  Inventory tracking + adjustments
+    bulk/                       Bulk import/export operations
+    printing/                   Receipt preview + WebView printing
+    settings/                   App configuration + preferences
 ```
+
+Each feature follows clean architecture:
+
+- `presentation/` - pages and widgets
+- `application/` - state and business logic
+- `domain/` - models and enums
+- `data/` - repository implementations and DB queries
+
+## Features
+
+### Sales Desk / Billing
+
+- Keyboard-first cart entry and checkout flow
+- 3-column image search cards with keyboard navigation
+- `/` shortcut to focus search
+- Enter-driven item add and qty/wt confirmation focus flow
+- Recent bills and bill edit flow
+- Hold / recall bills
+- Qty/Wt editing in the cart with step controls
+- Duplicate cart rows with merge action
+- Preview and print-ready checkout overlay
+
+### Bills
+
+- Saved bill list with filters and pagination
+- Bill reopen, edit, and delete actions
+
+### Items & Inventory
+
+- Item master list and redesigned add/edit form
+- Item image selection (JPG/JPEG), SKU-based rename, and managed storage path
+- Brand/category-aware metadata display
+- Inventory tracking and stock adjustments
+- Low-stock filtering and item metadata display
+
+### Bulk
+
+- Item bulk import/export
+- Inventory bulk import/export
+- Sample template downloads and batch result reporting
+
+### Settings
+
+- Section-based settings navigation
+- Store profile, print language, UPI, payment options, appearance
+- Admin session timeout configuration
+- Inventory control toggle
+- Item configuration:
+  - Category and brand management
+  - Brand propagation from catalog
+  - Wholesale auto-apply toggle
+  - Item Images Root Path configuration
+- Toast-based success and error messages
+
+### Authentication / Printing
+
+- Admin PIN/session protection
+- WebView-backed receipt preview and print flow
 
 ## Configuration
 
@@ -43,47 +115,48 @@ Runtime config resolves from `--dart-define` values (see
 ```
 flutter run -d windows \
   --dart-define=POS_ENV=staging \
-  --dart-define=POS_API_BASE_URL=http://10.0.0.5:8788 \
-  --dart-define=POS_DB_CLIENT=postgres \
   --dart-define=POS_DATABASE_URL=postgres://user:pass@host:5432/pos294
 ```
 
-| Define               | Default                          | Purpose                          |
-| -------------------- | -------------------------------- | -------------------------------- |
-| `POS_ENV`            | `development`                    | Environment variant              |
-| `POS_API_BASE_URL`   | per-environment default          | API bridge base URL              |
-| `POS_APP_VERSION`    | `0.1.0`                          | Reported app version             |
-| `POS_DB_CLIENT`      | `postgres`                       | Bridge DB backend (`postgres`/`sqlite`) |
-| `POS_DATABASE_URL`   | `postgres://…@localhost/pos294`  | Postgres connection string       |
-| `POS_SQLITE_DB_PATH` | `data/pos-294.sqlite`            | SQLite file path                 |
+| Define | Default | Purpose |
+| --- | --- | --- |
+| `POS_ENV` | `development` | Environment variant |
+| `POS_APP_VERSION` | `0.1.0` | Reported app version |
+| `POS_DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/pos294` | PostgreSQL connection string |
 
-The DB selection mirrors the Electron app's `DB_CLIENT` / `DATABASE_URL` /
-`SQLITE_DB_PATH` environment variables. Postgres is the default backend.
+The connection URL is parsed to extract host, port, database, username, and password.
+Postgres is the only supported database backend (direct connection from the app).
 
-## API bridge contract
+## Database connection
 
-`core/api/api_endpoints.dart` freezes the endpoint map that mirrors the
-operations previously exposed over Electron IPC (`src/preload/preload.js`).
-All failures are normalized to `ApiException` with a stable `ApiErrorCode`
-(`core/api/error_mapper.dart`) so user-facing error messaging stays consistent.
+`core/database/` contains a platform-aware database abstraction:
 
-## Migration status
+**Windows (Native):**
+- Direct TCP socket connection to PostgreSQL using the `postgres` package
+- No intermediary required; queries execute directly
 
-| Phase | Scope                          | Status         |
-| ----- | ------------------------------ | -------------- |
-| 1     | Windows foundation / shell     | Implemented    |
-| 2     | Core billing (Sales Desk)      | Placeholder    |
-| 3     | Bills & hold/resume            | Placeholder    |
-| 4     | Items & inventory              | Placeholder    |
-| 5     | Reports & settings             | Placeholder    |
-| 6     | Bulk operations                | Placeholder    |
-| 7     | WebView-backed printing        | Placeholder    |
+**Web:**
+- HTTP proxy to a backend API (for CORS and security)
+- Expects backend endpoints at `/api/db/{query,execute,begin,commit,rollback}`
+- Backend must proxy requests to PostgreSQL
+- Gracefully degrades if API is unavailable (logs warnings, allows app to load)
 
-## Development
+### Web
 
+Requires the backend API proxy server. See **[WEB_DATABASE_SETUP.md](WEB_DATABASE_SETUP.md)** for full instructions.
+
+```bash
+# Terminal 1: Start backend API server
+cd backend && dart pub get
+dart run server.dart --db-host localhost --db-port 5432 --db-name pos294 --db-user postgres --db-password postgres --port 3000
+
+# Terminal 2: Run Flutter web app
+flutter run -d chrome \
+  --dart-define=POS_DATABASE_URL=postgres://postgres:postgres@localhost:5432/pos294
 ```
-flutter pub get
-flutter analyze
-flutter test
-flutter run -d windows        # requires the Visual Studio C++ desktop toolchain
-```
+
+Tests are not required for this project.
+
+---
+
+Product developed and maintained by **silex-dv** — **https://silexdv.com**

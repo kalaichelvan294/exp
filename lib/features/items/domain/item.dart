@@ -38,8 +38,9 @@ class Item {
   final num invMinWeight;
 
   /// "nameTa / name" when a Tamil name is present, else the English name.
-  String get displayName =>
-      nameTa.trim().isNotEmpty ? '${nameTa.trim()} / ${name.trim()}' : name.trim();
+  String get displayName => nameTa.trim().isNotEmpty
+      ? '${nameTa.trim()} / ${name.trim()}'
+      : name.trim();
 
   /// "quantity" for UNIT items, "weight" for WEIGHT items.
   String get trackType =>
@@ -59,20 +60,39 @@ class Item {
   factory Item.fromJson(Map<String, dynamic> json) {
     num asNum(Object? v) => v is num ? v : num.tryParse('${v ?? ''}') ?? 0;
     int asInt(Object? v) => asNum(v).round();
-    final retail = asInt(json['retailPricePaise'] ?? json['rate']);
+    final retail = asInt(
+      json['retailPricePaise'] ??
+          json['retail_price_paise'] ??
+          json['rate'] ??
+          json['retailPrice'] ??
+          0,
+    );
+    final brand = json['brandName'] ?? json['brand_name'] ?? '';
+    final pricingWire = json['pricingType'] ?? json['pricing_type'] ?? 'unit';
+    final wholesalePaise =
+        json['wholesalePricePaise'] ??
+        json['wholesale_price_paise'] ??
+        json['wholesalePrice'];
+    final wholesaleMinQtyValue =
+        json['wholesaleMinQty'] ??
+        json['wholesale_min_qty'] ??
+        json['wholesaleMin'];
+
     return Item(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       nameTa: (json['nameTa'] ?? json['name_ta'] ?? '').toString(),
       category: (json['category'] ?? 'OTHER').toString(),
       sku: (json['sku'] ?? '').toString(),
-      pricingType: PricingType.fromWire(json['pricingType']),
-      brandName: (json['brandName'] ?? '').toString(),
+      pricingType: PricingType.fromWire(pricingWire),
+      brandName: brand.toString(),
       retailPricePaise: retail,
-      wholesalePricePaise:
-          json['wholesalePricePaise'] == null ? null : asInt(json['wholesalePricePaise']),
-      wholesaleMinQty:
-          json['wholesaleMinQty'] == null ? null : asNum(json['wholesaleMinQty']),
+      wholesalePricePaise: wholesalePaise == null
+          ? null
+          : asInt(wholesalePaise),
+      wholesaleMinQty: wholesaleMinQtyValue == null
+          ? null
+          : asNum(wholesaleMinQtyValue),
       invCurrentQty: asNum(json['inv_current_qty']),
       invCurrentWeight: asNum(json['inv_current_weight']),
       invMinQty: asNum(json['inv_min_qty']),

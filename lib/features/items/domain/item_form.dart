@@ -13,14 +13,16 @@ class SkuValidation {
   final bool exists;
   final String message;
 
-  static const requiredSku =
-      SkuValidation(valid: false, message: 'SKU is required.');
+  static const requiredSku = SkuValidation(
+    valid: false,
+    message: 'SKU is required.',
+  );
 
   factory SkuValidation.fromJson(Map<String, dynamic> json) => SkuValidation(
-        valid: json['valid'] == true,
-        exists: json['exists'] == true,
-        message: (json['message'] ?? '').toString(),
-      );
+    valid: json['valid'] == true,
+    exists: json['exists'] == true,
+    message: (json['message'] ?? '').toString(),
+  );
 }
 
 /// Editable item form inputs and their validation/serialization. Mirrors
@@ -96,18 +98,32 @@ class ItemFormData {
 
   /// Builds the `items:create` / `items:update` payload (prices in paise).
   Map<String, dynamic> toPayload() {
+    final retailPaise = Money.parseInrToPaise(retailPriceInput);
+    final wholesalePaise = _hasWholesalePrice
+        ? Money.parseInrToPaise(wholesalePriceInput)
+        : null;
+    final wholesaleMinQty = _hasWholesaleMinQty
+        ? num.tryParse(wholesaleMinQtyInput.trim())
+        : null;
+
     return {
       'name': name.trim(),
       'nameTa': nameTa.trim(),
       'category': category.trim().isEmpty ? 'OTHER' : category.trim(),
       'brandName': brandName.trim(),
+      'brand_name': brandName.trim(),
       'sku': normalizeSku(sku),
       'pricingType': pricingType.wire,
-      'retailPrice': Money.parseInrToPaise(retailPriceInput),
-      'wholesalePrice':
-          _hasWholesalePrice ? Money.parseInrToPaise(wholesalePriceInput) : null,
-      'wholesaleMinQty':
-          _hasWholesaleMinQty ? num.tryParse(wholesaleMinQtyInput.trim()) : null,
+      'pricing_type': pricingType.wire,
+      'retailPrice': retailPaise,
+      'retailPricePaise': retailPaise,
+      'retail_price_paise': retailPaise,
+      'rate': retailPaise,
+      'wholesalePrice': wholesalePaise,
+      'wholesalePricePaise': wholesalePaise,
+      'wholesale_price_paise': wholesalePaise,
+      'wholesaleMinQty': wholesaleMinQty,
+      'wholesale_min_qty': wholesaleMinQty,
     };
   }
 }

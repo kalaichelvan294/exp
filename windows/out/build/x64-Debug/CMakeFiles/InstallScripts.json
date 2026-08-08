@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/IdeaProjects/pos_294_flutter/windows/out/build/x64-Debug/cmake_install.cmake",
+		"D:/IdeaProjects/pos_294_flutter/windows/out/build/x64-Debug/flutter/cmake_install.cmake",
+		"D:/IdeaProjects/pos_294_flutter/windows/out/build/x64-Debug/runner/cmake_install.cmake",
+		"D:/IdeaProjects/pos_294_flutter/windows/out/build/x64-Debug/plugins/webview_windows/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
