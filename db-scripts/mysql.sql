@@ -2,14 +2,18 @@
 -- This is the canonical MySQL schema used by the app, with compatibility aliases
 -- for legacy Postgres table names kept so older scripts continue to work.
 
+CREATE DATABASE IF NOT EXISTS `pos294`;
+USE `pos294`;
+
+DROP VIEW IF EXISTS app_lifecycle_logs_legacy;
+DROP VIEW IF EXISTS bulk_import_batch;
+DROP VIEW IF EXISTS held_bills;
 DROP TABLE IF EXISTS product_audit;
 DROP TABLE IF EXISTS inventory_audit;
 DROP TABLE IF EXISTS bill_audit;
 DROP TABLE IF EXISTS app_lifecycle_logs;
 DROP TABLE IF EXISTS bill_holds;
-DROP TABLE IF EXISTS held_bills;
 DROP TABLE IF EXISTS bulk_batches;
-DROP TABLE IF EXISTS bulk_import_batch;
 DROP TABLE IF EXISTS app_settings;
 DROP TABLE IF EXISTS inventory_settings;
 DROP TABLE IF EXISTS settings;
@@ -82,8 +86,7 @@ CREATE TABLE bill_audit (
     new_subtotal_paise INT,
     new_discount_paise INT,
     new_grand_total_paise INT,
-    new_items_json JSON,
-    FOREIGN KEY (bill_id) REFERENCES bills(bill_id)
+    new_items_json JSON
 );
 
 CREATE TABLE bulk_batches (
@@ -111,8 +114,7 @@ CREATE TABLE bill_holds (
     bill_id VARCHAR(255) NOT NULL,
     bill_data JSON NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (bill_id) REFERENCES bills(bill_id)
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE inventory_audit (
@@ -128,9 +130,7 @@ CREATE TABLE inventory_audit (
     bill_id VARCHAR(255),
     reference_id VARCHAR(255),
     notes TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id),
-    FOREIGN KEY (bill_id) REFERENCES bills(bill_id)
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE product_audit (
@@ -156,8 +156,7 @@ CREATE TABLE product_audit (
     new_brand_name VARCHAR(255),
     new_retail_price_paise INT,
     new_wholesale_price_paise INT,
-    new_wholesale_min_qty DECIMAL(12,3),
-    FOREIGN KEY (item_id) REFERENCES products(id)
+    new_wholesale_min_qty DECIMAL(12,3)
 );
 
 CREATE TABLE settings (
@@ -210,7 +209,7 @@ SELECT * FROM app_lifecycle_logs;
 CREATE USER IF NOT EXISTS 'pos_app_user'@'%' IDENTIFIED BY 'change_me_strong_password';
 ALTER USER 'pos_app_user'@'%' IDENTIFIED BY 'change_me_strong_password';
 
-SET @db_name = DATABASE();
+SET @db_name = 'pos294';
 
 SET @grant_products = CONCAT(
   'GRANT SELECT, INSERT, UPDATE, DELETE ON `', @db_name, '`.`products` TO ''pos_app_user''@''%'''

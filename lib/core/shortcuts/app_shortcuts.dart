@@ -52,10 +52,6 @@ class AppShortcuts {
       ),
       const SingleActivator(LogicalKeyboardKey.slash):
           const FocusSearchIntent(),
-      const SingleActivator(LogicalKeyboardKey.enter, control: true):
-          const CheckoutIntent(),
-      const SingleActivator(LogicalKeyboardKey.keyH, control: true):
-          const HoldBillIntent(),
       const SingleActivator(LogicalKeyboardKey.escape): const CancelIntent(),
     };
   }

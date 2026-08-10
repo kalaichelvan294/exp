@@ -387,10 +387,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onChanged: (v) {
               final next = v ?? 'md';
               setState(() => _uiSizeVariant = next);
-              _c.previewAppearance(
-                themeMode: _themeMode,
-                uiSizeVariant: next,
-              );
+              _c.previewAppearance(themeMode: _themeMode, uiSizeVariant: next);
             },
           ),
         ),
@@ -714,10 +711,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: AppSpacing.x12),
-        const Text('Store Profile: Store Name, Business Type, Store Address, and FSSAI Number.'),
-        const Text('Print Language: Choose receipt language (English or Tamil).'),
+        const Text(
+          'Store Profile: Store Name, Business Type, Store Address, and FSSAI Number.',
+        ),
+        const Text(
+          'Print Language: Choose receipt language (English or Tamil).',
+        ),
         const Text('UPI Payment: Configure UPI ID and display name.'),
-        const Text('Payment Options: Enable Cash, GPay, and/or Card (at least one mode).'),
+        const Text(
+          'Payment Options: Enable Cash, GPay, and/or Card (at least one mode).',
+        ),
         const Text('Appearance: Set UI size and Light/Dark theme.'),
         const Text('Admin Session: Configure admin auto-logout timeout.'),
         const Text('Inventory Control: Toggle inventory tracking.'),
@@ -743,20 +746,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _ShortcutItem('F3', 'Global', 'Go to Items'),
       _ShortcutItem('F10', 'Global', 'Go to Settings'),
       _ShortcutItem('/', 'Global', 'Focus Sales Desk search'),
-      _ShortcutItem('Ctrl+Enter', 'Global', 'Checkout current bill'),
-      _ShortcutItem('Ctrl+H', 'Global', 'Hold current bill'),
       _ShortcutItem('Esc', 'Global', 'Cancel / close current context'),
-      _ShortcutItem('Alt+S', 'Sales Desk', 'Focus search'),
-      _ShortcutItem('Alt+N', 'Sales Desk', 'Start new bill'),
-      _ShortcutItem('Alt+H', 'Sales Desk', 'Hold current bill'),
-      _ShortcutItem('Alt+P', 'Sales Desk', 'Open preview'),
+      _ShortcutItem('Ctrl+S', 'Sales Desk', 'Focus search'),
+      _ShortcutItem('Ctrl+N', 'Sales Desk', 'Start new bill'),
+      _ShortcutItem('Ctrl+H', 'Sales Desk', 'Hold current bill'),
+      _ShortcutItem('Ctrl+P', 'Sales Desk', 'Print / save bill'),
       _ShortcutItem('F4', 'Sales Desk', 'Open preview or Save & Print'),
       _ShortcutItem('Delete', 'Sales Desk', 'Remove selected cart row'),
-      _ShortcutItem('Arrow Up/Down/Left/Right', 'Sales Desk Search', 'Move selection in search grid'),
+      _ShortcutItem(
+        'Arrow Up/Down/Left/Right',
+        'Sales Desk Search',
+        'Move selection in search grid',
+      ),
       _ShortcutItem('Enter', 'Sales Desk Search', 'Add selected item'),
-      _ShortcutItem('Enter', 'Cart Qty/Weight', 'Confirm qty and return focus to search'),
+      _ShortcutItem(
+        'Enter',
+        'Cart Qty/Weight',
+        'Confirm qty and return focus to search',
+      ),
       _ShortcutItem('Esc', 'Sales Desk Search', 'Close search dropdown'),
-      _ShortcutItem('Alt+C', 'Bills', 'Return to Sales Desk'),
+      _ShortcutItem('Ctrl+B', 'Bills', 'Return to Sales Desk'),
     ];
 
     return Table(
@@ -772,15 +781,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           children: [
             Padding(
               padding: EdgeInsets.all(AppSpacing.x8),
-              child: Text('Shortcut', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(
+                'Shortcut',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
             Padding(
               padding: EdgeInsets.all(AppSpacing.x8),
-              child: Text('Scope', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(
+                'Scope',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
             Padding(
               padding: EdgeInsets.all(AppSpacing.x8),
-              child: Text('Action', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(
+                'Action',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),

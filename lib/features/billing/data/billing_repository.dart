@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/db_connection.dart';
 import '../../../core/database/db_providers.dart';
+import '../domain/bill_id.dart';
 import '../domain/bill_data.dart';
 import '../domain/product.dart';
 
@@ -13,7 +16,9 @@ class SaveBillResult {
 }
 
 class HoldResult {
-  const HoldResult({required this.holdsLeft});
+  const HoldResult({required this.holdId, required this.holdsLeft});
+
+  final String holdId;
   final int holdsLeft;
 }
 
@@ -63,6 +68,69 @@ class BillingRepository {
 
   final DbConnection _db;
 
+  Map<String, dynamic> _asMap(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k?.toString() ?? '', v));
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      final decoded = jsonDecode(value);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k?.toString() ?? '', v));
+      }
+    }
+    return const <String, dynamic>{};
+  }
+
+  String _jsonSqlLiteral(Map<String, dynamic> json) =>
+      jsonEncode(json).replaceAll("'", "''");
+
+  String _jsonSqlString(Map<String, dynamic> json) =>
+      "'${_jsonSqlLiteral(json)}'";
+
+  String _sqlString(String value) => "'${value.replaceAll("'", "''")}'";
+
+  String _billSqlValues(BillData bill) {
+    return [
+      _sqlString(bill.billId),
+      'CURRENT_TIMESTAMP',
+      _sqlString(bill.paymentMode.wire),
+      _sqlString(bill.discountMode.wire),
+      bill.discountValue.toString(),
+      bill.itemCount.toString(),
+      bill.subtotalPaise.toString(),
+      bill.discountPaise.toString(),
+      bill.grandTotalPaise.toString(),
+      _jsonSqlString(bill.toJson()),
+    ].join(', ');
+  }
+
+  Future<void> _insertBill(BillData bill) async {
+    await _db.execute(
+      'INSERT INTO bills (bill_id, created_at, payment_mode, discount_mode, '
+      'discount_value, item_count, subtotal_paise, discount_paise, '
+      'grand_total_paise, bill_data) VALUES (${_billSqlValues(bill)})',
+    );
+  }
+
+  Future<void> _updateBill(String billId, BillData bill) async {
+    final escapedBillId = billId.replaceAll("'", "''");
+    await _db.execute(
+      'UPDATE bills SET '
+      'payment_mode = ${_sqlString(bill.paymentMode.wire)}, '
+      'discount_mode = ${_sqlString(bill.discountMode.wire)}, '
+      'discount_value = ${bill.discountValue}, '
+      'item_count = ${bill.itemCount}, '
+      'subtotal_paise = ${bill.subtotalPaise}, '
+      'discount_paise = ${bill.discountPaise}, '
+      'grand_total_paise = ${bill.grandTotalPaise}, '
+      'bill_data = ${_jsonSqlString(bill.toJson())}, '
+      'updated_at = CURRENT_TIMESTAMP '
+      "WHERE bill_id = '$escapedBillId'",
+    );
+  }
+
   Future<List<Product>> searchProducts(String query, {int limit = 8}) async {
     final escapedQuery = query.replaceAll("'", "''").toLowerCase();
     final rows = await _db.query(
@@ -80,19 +148,16 @@ class BillingRepository {
   }
 
   Future<SaveBillResult> saveBill(BillData bill) async {
-    final escapedBillId = bill.billId.replaceAll("'", "''");
-    final billDataStr = bill.toJson().toString().replaceAll("'", "''");
-    await _db.execute(
-      "INSERT INTO bills (bill_id, bill_data, created_at) VALUES ('$escapedBillId', '$billDataStr', CURRENT_TIMESTAMP)",
-    );
-    return SaveBillResult(billId: escapedBillId);
+    await _insertBill(bill);
+    return SaveBillResult(billId: bill.billId);
   }
 
   Future<HoldResult> holdBill(BillData bill) async {
-    final escapedBillId = bill.billId.replaceAll("'", "''");
-    final billDataStr = bill.toJson().toString().replaceAll("'", "''");
+    final holdId =
+        'hold-${BillId.generate()}-${DateTime.now().microsecondsSinceEpoch}';
+    final escapedHoldId = holdId.replaceAll("'", "''");
     await _db.execute(
-      "INSERT INTO bill_holds (bill_id, bill_data, created_at) VALUES ('$escapedBillId', '$billDataStr', CURRENT_TIMESTAMP)",
+      "INSERT INTO bill_holds (hold_id, bill_id, bill_data, created_at) VALUES ('$escapedHoldId', '${bill.billId.replaceAll("'", "''")}', ${_jsonSqlString(bill.toJson())}, CURRENT_TIMESTAMP)",
     );
     final countResult = await _db.query(
       'SELECT COUNT(*) as count FROM bill_holds',
@@ -100,7 +165,7 @@ class BillingRepository {
     final holdsLeft = (countResult.isNotEmpty
         ? int.parse(countResult.first['count'].toString())
         : 0);
-    return HoldResult(holdsLeft: holdsLeft);
+    return HoldResult(holdId: holdId, holdsLeft: holdsLeft);
   }
 
   Future<BillListResult> listBills({
@@ -121,7 +186,8 @@ class BillingRepository {
     if (paymentMode.isNotEmpty) {
       final escapedPaymentMode = paymentMode.replaceAll("'", "''");
       whereClause +=
-          " AND JSON_UNQUOTE(JSON_EXTRACT(bill_data, '\$.paymentMode')) = '$escapedPaymentMode'";
+          " AND (payment_mode = '$escapedPaymentMode' OR "
+          "JSON_UNQUOTE(JSON_EXTRACT(bill_data, '\$.paymentMode')) = '$escapedPaymentMode')";
     }
     if (dateFrom.isNotEmpty) {
       whereClause += " AND created_at >= '$dateFrom'";
@@ -137,9 +203,22 @@ class BillingRepository {
         ? int.parse(totalResult.first['count'].toString())
         : 0;
 
-    final rows = await _db.query(
-      'SELECT bill_id, bill_data, created_at FROM bills $whereClause ORDER BY created_at DESC LIMIT $pageSize OFFSET $offset',
-    );
+    final rows =
+        (await _db.query(
+              'SELECT bill_id AS billId, bill_data AS billData, created_at AS createdAt, '
+              'payment_mode AS paymentMode, discount_mode AS discountMode, '
+              'discount_value AS discountValue, item_count AS itemCount, '
+              'subtotal_paise AS subtotalPaise, discount_paise AS discountPaise, '
+              'grand_total_paise AS grandTotalPaise '
+              'FROM bills $whereClause ORDER BY created_at DESC LIMIT $pageSize OFFSET $offset',
+            ))
+            .map(
+              (row) => <String, dynamic>{
+                ...row,
+                'billData': _asMap(row['billData'] ?? row['bill_data']),
+              },
+            )
+            .toList();
 
     return BillListResult(
       total: total,
@@ -155,15 +234,11 @@ class BillingRepository {
       "SELECT bill_data FROM bills WHERE bill_id = '$escapedBillId' LIMIT 1",
     );
     if (rows.isEmpty) throw StateError('Bill $billId was not found.');
-    return rows.first['bill_data'] as Map<String, dynamic>;
+    return _asMap(rows.first['bill_data'] ?? rows.first['billData']);
   }
 
   Future<void> updateBill(String billId, BillData bill) async {
-    final escapedBillId = billId.replaceAll("'", "''");
-    final billDataStr = bill.toJson().toString().replaceAll("'", "''");
-    await _db.execute(
-      "UPDATE bills SET bill_data = '$billDataStr', updated_at = CURRENT_TIMESTAMP WHERE bill_id = '$escapedBillId'",
-    );
+    await _updateBill(billId, bill);
   }
 
   Future<void> deleteBill(String billId) async {
@@ -173,13 +248,15 @@ class BillingRepository {
 
   Future<HeldBillsPage> listHeldBills({int limit = 3}) async {
     final rows = await _db.query(
-      'SELECT hold_id, bill_id, bill_data FROM bill_holds ORDER BY created_at DESC LIMIT $limit',
+      'SELECT hold_id AS holdId, bill_id AS billId, bill_data AS billData, '
+      'created_at AS createdAt FROM bill_holds ORDER BY created_at DESC LIMIT $limit',
     );
     final summaries = rows.map((row) {
-      final data = (row['bill_data'] as Map<String, dynamic>?) ?? const {};
+      final data = _asMap(row['billData'] ?? row['bill_data']);
       return HeldBillSummary(
-        holdId: (row['hold_id'] ?? '').toString(),
-        billId: (data['billId'] ?? row['bill_id'] ?? '').toString(),
+        holdId: (row['holdId'] ?? row['hold_id'] ?? '').toString(),
+        billId: (data['billId'] ?? row['billId'] ?? row['bill_id'] ?? '')
+            .toString(),
         grandTotalPaise:
             int.tryParse(data['grandTotalPaise']?.toString() ?? '0') ?? 0,
         raw: data,
@@ -195,7 +272,7 @@ class BillingRepository {
       "SELECT bill_data FROM bill_holds WHERE hold_id = '$escapedHoldId' LIMIT 1",
     );
     if (rows.isEmpty) throw StateError('Held bill was not found.');
-    return rows.first['bill_data'] as Map<String, dynamic>;
+    return _asMap(rows.first['bill_data'] ?? rows.first['billData']);
   }
 
   Future<void> deleteHeldBill(String holdId) async {

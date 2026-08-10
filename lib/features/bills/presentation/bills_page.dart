@@ -13,9 +13,9 @@ import '../application/bills_state.dart';
 import '../domain/bill_filters.dart';
 import '../domain/bill_summary.dart';
 
-/// Bills list (Phase 3). Ports the Electron bills page: filter, paginate, and
-/// open a saved bill in the Sales Desk for editing. Alt+C returns to the Sales
-/// Desk (parity with the Electron footer shortcut).
+/// Bills list (Phase 3). Ports the bills page: filter, paginate, and
+/// open a saved bill in the Sales Desk for editing. Ctrl+B returns to the
+/// Sales Desk (parity with the footer shortcut).
 class BillsPage extends ConsumerStatefulWidget {
   const BillsPage({super.key});
 
@@ -38,12 +38,14 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   BillsController get _c => ref.read(billsControllerProvider.notifier);
 
   void _apply() {
-    _c.applyFilters(BillFilters(
-      billId: _billIdController.text.trim(),
-      paymentMode: _paymentMode,
-      dateFrom: _dateFrom,
-      dateTo: _dateTo,
-    ));
+    _c.applyFilters(
+      BillFilters(
+        billId: _billIdController.text.trim(),
+        paymentMode: _paymentMode,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      ),
+    );
   }
 
   void _clear() {
@@ -59,9 +61,10 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    final alt = keys.contains(LogicalKeyboardKey.altLeft) ||
-        keys.contains(LogicalKeyboardKey.altRight);
-    if (alt && event.logicalKey == LogicalKeyboardKey.keyC) {
+    final ctrl =
+        keys.contains(LogicalKeyboardKey.controlLeft) ||
+        keys.contains(LogicalKeyboardKey.controlRight);
+    if (ctrl && event.logicalKey == LogicalKeyboardKey.keyB) {
       context.go(AppRoutes.billing.path);
       return KeyEventResult.handled;
     }
@@ -91,9 +94,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
             ),
             const SizedBox(height: AppSpacing.x16),
             Expanded(
-              child: AppCard(
-                child: _BillsTable(state: state),
-              ),
+              child: AppCard(child: _BillsTable(state: state)),
             ),
             const SizedBox(height: AppSpacing.x16),
             _Pagination(state: state),
@@ -157,28 +158,25 @@ class _FiltersBar extends StatelessWidget {
               initialValue: paymentMode,
               isExpanded: true,
               items: _paymentModeOptions
-                  .map((m) => DropdownMenuItem(
-                        value: m,
-                        child: Text(m.isEmpty ? 'All Modes' : m),
-                      ))
+                  .map(
+                    (m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(m.isEmpty ? 'All Modes' : m),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) => onPaymentModeChanged(v ?? ''),
               decoration: const InputDecoration(
                 hintText: 'Payment',
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
               ),
             ),
           ),
-          _DateField(
-            label: 'From',
-            value: dateFrom,
-            onPicked: onPickDateFrom,
-          ),
-          _DateField(
-            label: 'To',
-            value: dateTo,
-            onPicked: onPickDateTo,
-          ),
+          _DateField(label: 'From', value: dateFrom, onPicked: onPickDateFrom),
+          _DateField(label: 'To', value: dateTo, onPicked: onPickDateTo),
           FilledButton(onPressed: onApply, child: const Text('Apply')),
           OutlinedButton(onPressed: onClear, child: const Text('Clear')),
         ],
@@ -242,7 +240,9 @@ class _BillsTable extends StatelessWidget {
       return Center(
         child: Text(
           state.error!,
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.error500),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.error500,
+          ),
         ),
       );
     }
@@ -275,9 +275,14 @@ class _BillsHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-        fontWeight: FontWeight.w600, color: AppColors.neutral700);
+      fontWeight: FontWeight.w600,
+      color: AppColors.neutral700,
+    );
     Widget cell(String text, int flex, {TextAlign align = TextAlign.left}) =>
-        Expanded(flex: flex, child: Text(text, style: style, textAlign: align));
+        Expanded(
+          flex: flex,
+          child: Text(text, style: style, textAlign: align),
+        );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.x8),
       child: Row(
@@ -303,18 +308,25 @@ class _BillRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    Widget cell(String text, int flex,
-            {TextAlign align = TextAlign.left, TextStyle? style}) =>
-        Expanded(
-          flex: flex,
-          child: Text(text,
-              style: style ?? theme.textTheme.bodyMedium,
-              textAlign: align,
-              overflow: TextOverflow.ellipsis),
-        );
+    Widget cell(
+      String text,
+      int flex, {
+      TextAlign align = TextAlign.left,
+      TextStyle? style,
+    }) => Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        style: style ?? theme.textTheme.bodyMedium,
+        textAlign: align,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
     return InkWell(
-      onTap: () => context.go('${AppRoutes.billing.path}?billId='
-          '${Uri.encodeComponent(bill.billId)}'),
+      onTap: () => context.go(
+        '${AppRoutes.billing.path}?billId='
+        '${Uri.encodeComponent(bill.billId)}',
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.x8),
         child: Row(
@@ -324,12 +336,19 @@ class _BillRow extends StatelessWidget {
             cell(bill.paymentMode, 2),
             cell('${bill.itemCount}', 2, align: TextAlign.right),
             cell(Money.format(bill.subtotalPaise), 2, align: TextAlign.right),
-            cell('-${Money.format(bill.discountPaise)}', 2,
-                align: TextAlign.right),
-            cell(Money.format(bill.grandTotalPaise), 2,
-                align: TextAlign.right,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
+            cell(
+              '-${Money.format(bill.discountPaise)}',
+              2,
+              align: TextAlign.right,
+            ),
+            cell(
+              Money.format(bill.grandTotalPaise),
+              2,
+              align: TextAlign.right,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),
@@ -355,8 +374,10 @@ class _Pagination extends ConsumerWidget {
           label: const Text('Prev'),
         ),
         const SizedBox(width: AppSpacing.x16),
-        Text('Page ${state.page} / ${state.totalPages}',
-            style: theme.textTheme.bodyMedium),
+        Text(
+          'Page ${state.page} / ${state.totalPages}',
+          style: theme.textTheme.bodyMedium,
+        ),
         const SizedBox(width: AppSpacing.x16),
         OutlinedButton.icon(
           onPressed: state.canNext ? c.nextPage : null,
@@ -376,8 +397,18 @@ String formatBillDateTime(String value) {
   if (date == null) return value;
   final local = date.toLocal();
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   final day = local.day.toString().padLeft(2, '0');
   final month = months[local.month - 1];

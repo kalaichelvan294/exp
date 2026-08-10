@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_tokens.dart';
@@ -121,31 +122,47 @@ class _CartRow extends ConsumerStatefulWidget {
 class _CartRowState extends ConsumerState<_CartRow> {
   late final TextEditingController _qtyController;
   late final FocusNode _qtyFocusNode;
+  late String _lastSyncedQtyDisplay;
+
+  void _requestQtyFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _qtyFocusNode.requestFocus();
+      _qtyController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _qtyController.text.length,
+      );
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _qtyController = TextEditingController(text: widget.line.qtyDisplay);
+    _lastSyncedQtyDisplay = widget.line.qtyDisplay;
+    _qtyController = TextEditingController(text: _lastSyncedQtyDisplay);
     _qtyFocusNode = FocusNode();
+    if (widget.selected) {
+      _requestQtyFocus();
+    }
   }
 
   @override
   void didUpdateWidget(covariant _CartRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.line.qtyDisplay != widget.line.qtyDisplay &&
-        !_qtyFocusNode.hasFocus) {
-      _qtyController.text = widget.line.qtyDisplay;
+    final nextQtyDisplay = widget.line.qtyDisplay;
+    if (nextQtyDisplay != _lastSyncedQtyDisplay) {
+      _lastSyncedQtyDisplay = nextQtyDisplay;
+      _qtyController.text = nextQtyDisplay;
+      if (_qtyFocusNode.hasFocus) {
+        _qtyController.selection = TextSelection.collapsed(
+          offset: _qtyController.text.length,
+        );
+      }
     }
     if (widget.selected &&
-        oldWidget.qtyFocusRequestToken != widget.qtyFocusRequestToken) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _qtyFocusNode.requestFocus();
-        _qtyController.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: _qtyController.text.length,
-        );
-      });
+        (!oldWidget.selected ||
+            oldWidget.qtyFocusRequestToken != widget.qtyFocusRequestToken)) {
+      _requestQtyFocus();
     }
   }
 
@@ -169,6 +186,14 @@ class _CartRowState extends ConsumerState<_CartRow> {
   void _commitQtyAndFocusSearch() {
     _commitQty();
     widget.onQtyConfirmed();
+  }
+
+  void _nudgeQty(num delta) {
+    final c = ref.read(billingControllerProvider.notifier);
+    final current = num.tryParse(_qtyController.text.trim()) ?? widget.line.qty;
+    final next = current + delta;
+    if (next < 0) return;
+    c.updateQty(widget.index, next, commit: true);
   }
 
   @override
@@ -284,18 +309,39 @@ class _CartRowState extends ConsumerState<_CartRow> {
         const SizedBox(width: AppSpacing.x4),
         SizedBox(
           width: isWeight ? 84 : 68,
-          child: TextField(
-            controller: _qtyController,
-            focusNode: _qtyFocusNode,
-            textAlign: TextAlign.right,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _commitQtyAndFocusSearch(),
-            onEditingComplete: _commitQty,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          child: Focus(
+            onKeyEvent: (node, event) {
+              if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+                return KeyEventResult.ignored;
+              }
+              if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                _nudgeQty(isWeight ? 0.1 : 1);
+                return KeyEventResult.handled;
+              }
+              if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                _nudgeQty(isWeight ? -0.1 : -1);
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: TextField(
+              controller: _qtyController,
+              focusNode: _qtyFocusNode,
+              textAlign: TextAlign.right,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _commitQtyAndFocusSearch(),
+              onEditingComplete: _commitQty,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 10,
+                ),
+              ),
             ),
           ),
         ),

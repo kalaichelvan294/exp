@@ -18,7 +18,7 @@ import 'widgets/preview_overlay.dart';
 ///
 /// Layout follows the POS billing rules: sales area 75% / checkout 25%. The
 /// preview overlay replaces the layout when active. Keyboard model ports the
-/// Electron shortcuts (Alt+S/N/H/P, F4, Delete, Esc).
+/// Electron shortcuts (Ctrl+S/N/H/P, F4, Delete, Esc).
 ///
 /// When [editBillId] is supplied (via `/billing?billId=`), the referenced saved
 /// bill is loaded for editing (Phase 3 edit flow).
@@ -62,9 +62,9 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final state = ref.read(billingControllerProvider);
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    final alt =
-        keys.contains(LogicalKeyboardKey.altLeft) ||
-        keys.contains(LogicalKeyboardKey.altRight);
+    final ctrl =
+        keys.contains(LogicalKeyboardKey.controlLeft) ||
+        keys.contains(LogicalKeyboardKey.controlRight);
 
     if (event.logicalKey == LogicalKeyboardKey.escape && state.previewVisible) {
       _c.hidePreview();
@@ -81,13 +81,25 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       return KeyEventResult.handled;
     }
 
-    if (state.previewVisible) return KeyEventResult.ignored;
+    if (state.previewVisible) {
+      if (ctrl && event.logicalKey == LogicalKeyboardKey.keyP) {
+        if (!state.submitting) _c.checkout();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
 
     if (event.logicalKey == LogicalKeyboardKey.delete) {
       if (_c.removeSelectedLine()) return KeyEventResult.handled;
     }
 
-    if (alt) {
+    if (event.logicalKey == LogicalKeyboardKey.slash ||
+        event.character == '/') {
+      _focusSearch();
+      return KeyEventResult.handled;
+    }
+
+    if (ctrl) {
       switch (event.logicalKey) {
         case LogicalKeyboardKey.keyS:
           _focusSearch();
@@ -99,7 +111,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           _c.holdCurrentBill();
           return KeyEventResult.handled;
         case LogicalKeyboardKey.keyP:
-          if (state.canCheckout) _c.showPreview();
+          if (state.isEditing) {
+            _c.reprintCurrentBill();
+          } else if (state.canCheckout) {
+            _c.showPreview();
+          }
           return KeyEventResult.handled;
       }
     }
@@ -323,7 +339,7 @@ class _HeaderActions extends ConsumerWidget {
           OutlinedButton.icon(
             onPressed: c.reprintCurrentBill,
             icon: const Icon(Icons.print_outlined, size: 18),
-            label: const Text('Reprint'),
+            label: const Text('Reprint (Ctrl+P)'),
           ),
           const SizedBox(width: AppSpacing.x8),
           OutlinedButton.icon(
@@ -353,13 +369,13 @@ class _HeaderActions extends ConsumerWidget {
         OutlinedButton.icon(
           onPressed: state.canHold ? c.holdCurrentBill : null,
           icon: const Icon(Icons.pause, size: 18),
-          label: const Text('Hold Bill (Alt+H)'),
+          label: const Text('Hold Bill (Ctrl+H)'),
         ),
         const SizedBox(width: AppSpacing.x8),
         OutlinedButton.icon(
           onPressed: c.startNewBill,
           icon: const Icon(Icons.add_circle_outline, size: 18),
-          label: const Text('New Bill (Alt+N)'),
+          label: const Text('New Bill (Ctrl+N)'),
         ),
       ],
     );

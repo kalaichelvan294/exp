@@ -6,6 +6,7 @@ import 'cart_line.dart';
 class BillItem {
   const BillItem({
     required this.id,
+    required this.sku,
     required this.name,
     this.nameTa = '',
     this.brandName = '',
@@ -21,6 +22,7 @@ class BillItem {
   });
 
   final String id;
+  final String sku;
   final String name;
   final String nameTa;
   final String brandName;
@@ -35,36 +37,38 @@ class BillItem {
   final int lineTotalPaise;
 
   factory BillItem.fromCartLine(CartLine line) => BillItem(
-        id: line.id,
-        name: line.name,
-        nameTa: line.nameTa,
-        brandName: line.brandName,
-        category: line.category,
-        pricingType: line.pricingType,
-        qty: line.qty,
-        retailPricePaise: line.retailRatePaise,
-        wholesalePricePaise: line.wholesaleRatePaise,
-        wholesaleMinQty: line.wholesaleMinQty,
-        priceTier: line.priceTier,
-        ratePaise: line.ratePaise,
-        lineTotalPaise: line.lineTotalPaise,
-      );
+    id: line.id,
+    sku: line.sku,
+    name: line.name,
+    nameTa: line.nameTa,
+    brandName: line.brandName,
+    category: line.category,
+    pricingType: line.pricingType,
+    qty: line.qty,
+    retailPricePaise: line.retailRatePaise,
+    wholesalePricePaise: line.wholesaleRatePaise,
+    wholesaleMinQty: line.wholesaleMinQty,
+    priceTier: line.priceTier,
+    ratePaise: line.ratePaise,
+    lineTotalPaise: line.lineTotalPaise,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'nameTa': nameTa,
-        'brandName': brandName,
-        'category': category,
-        'pricingType': pricingType.wire,
-        'qty': qty,
-        'retailPricePaise': retailPricePaise,
-        'wholesalePricePaise': wholesalePricePaise,
-        'wholesaleMinQty': wholesaleMinQty,
-        'priceTier': priceTier.wire,
-        'rate': ratePaise,
-        'lineTotalPaise': lineTotalPaise,
-      };
+    'id': id,
+    'sku': sku,
+    'name': name,
+    'nameTa': nameTa,
+    'brandName': brandName,
+    'category': category,
+    'pricingType': pricingType.wire,
+    'qty': qty,
+    'retailPricePaise': retailPricePaise,
+    'wholesalePricePaise': wholesalePricePaise,
+    'wholesaleMinQty': wholesaleMinQty,
+    'priceTier': priceTier.wire,
+    'rate': ratePaise,
+    'lineTotalPaise': lineTotalPaise,
+  };
 }
 
 /// The bill payload sent to the API bridge and used as the receipt payload for
@@ -118,15 +122,15 @@ class BillData {
   }
 
   Map<String, dynamic> toJson() => {
-        'billId': billId,
-        'paymentMode': paymentMode.wire,
-        'discountMode': discountMode.wire,
-        'discountValue': discountValue,
-        'itemCount': itemCount,
-        'subtotalPaise': subtotalPaise,
-        'discountPaise': discountPaise,
-        'grandTotalPaise': grandTotalPaise,
-        'items': items.map((i) => i.toJson()).toList(),
-        'createdAt': createdAt,
-      };
+    'billId': billId,
+    'paymentMode': paymentMode.wire,
+    'discountMode': discountMode.wire,
+    'discountValue': discountValue,
+    'itemCount': itemCount,
+    'subtotalPaise': subtotalPaise,
+    'discountPaise': discountPaise,
+    'grandTotalPaise': grandTotalPaise,
+    'items': items.map((i) => i.toJson()).toList(),
+    'createdAt': createdAt,
+  };
 }

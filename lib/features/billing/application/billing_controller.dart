@@ -333,6 +333,7 @@ class BillingController extends Notifier<BillingState> {
       cart: const [],
       selectedCartIndex: -1,
       pendingBillId: '',
+      activeHoldId: '',
       editingBillId: '',
       editingCreatedAt: '',
       discountValue: 0,
@@ -366,8 +367,17 @@ class BillingController extends Notifier<BillingState> {
         cart: const [],
         selectedCartIndex: -1,
         pendingBillId: '',
+        activeHoldId: '',
         discountValue: 0,
         previewVisible: false,
+        heldBills: [
+          HeldBillChip(
+            holdId: result.holdId,
+            label: bill.billId,
+            amountPaise: bill.grandTotalPaise,
+          ),
+          ...state.heldBills.where((chip) => chip.holdId != result.holdId),
+        ],
         message: BillingMessage(
           'Bill held successfully. Holds left: ${result.holdsLeft}.',
         ),
@@ -434,13 +444,14 @@ class BillingController extends Notifier<BillingState> {
         paymentMode: PaymentMode.fromWire(data['paymentMode']),
         discountMode: DiscountMode.fromWire(data['discountMode']),
         discountValue: _parsePositive(data['discountValue']),
-        pendingBillId: (data['billId'] ?? '').toString().trim(),
+        pendingBillId: '',
+        activeHoldId: holdId,
         editingBillId: '',
         editingCreatedAt: '',
         cart: cart,
         selectedCartIndex: -1,
         message: BillingMessage(
-          'Resumed held bill ${data['billId'] ?? holdId}.',
+          'Resumed held bill ${data['billId'] ?? holdId}. A new bill id will be generated on save.',
         ),
       );
       await loadHeldBills();
@@ -492,6 +503,7 @@ class BillingController extends Notifier<BillingState> {
         discountMode: DiscountMode.fromWire(data['discountMode']),
         discountValue: _parsePositive(data['discountValue']),
         pendingBillId: id,
+        activeHoldId: '',
         editingBillId: id,
         editingCreatedAt: (data['createdAt'] ?? '').toString(),
         cart: cart,
@@ -514,6 +526,7 @@ class BillingController extends Notifier<BillingState> {
       cart: const [],
       selectedCartIndex: -1,
       pendingBillId: '',
+      activeHoldId: '',
       editingBillId: '',
       editingCreatedAt: '',
       discountValue: 0,
@@ -603,6 +616,7 @@ class BillingController extends Notifier<BillingState> {
           ? state.editingCreatedAt
           : null,
     );
+    final activeHoldId = state.activeHoldId.trim();
     state = state.copyWith(submitting: true);
 
     // Edit mode: update the existing bill and stay in the editor (parity).
@@ -612,11 +626,22 @@ class BillingController extends Notifier<BillingState> {
         state = state.copyWith(
           submitting: false,
           previewVisible: false,
+          activeHoldId: '',
+          recentBills: [
+            RecentBillChip(
+              billId: state.editingBillId,
+              amountPaise: bill.grandTotalPaise,
+            ),
+            ...state.recentBills.where(
+              (chip) => chip.billId != state.editingBillId,
+            ),
+          ],
           message: BillingMessage(
             'Bill ${state.editingBillId} updated (${state.paymentMode.wire}) '
             'total ₹${(bill.grandTotalPaise / 100).toStringAsFixed(2)}.',
           ),
         );
+        await loadRecentBills();
       } catch (e) {
         state = state.copyWith(
           submitting: false,
@@ -640,8 +665,16 @@ class BillingController extends Notifier<BillingState> {
         cart: const [],
         selectedCartIndex: -1,
         pendingBillId: '',
+        activeHoldId: '',
         discountValue: 0,
         previewVisible: false,
+        recentBills: [
+          RecentBillChip(
+            billId: result.billId,
+            amountPaise: bill.grandTotalPaise,
+          ),
+          ...state.recentBills.where((chip) => chip.billId != result.billId),
+        ],
       );
       state = base.copyWith(
         message: outcome.failed
@@ -657,6 +690,19 @@ class BillingController extends Notifier<BillingState> {
               ),
       );
       await loadRecentBills();
+      if (activeHoldId.isNotEmpty) {
+        try {
+          await _repo.deleteHeldBill(activeHoldId);
+          await loadHeldBills();
+        } catch (e) {
+          state = state.copyWith(
+            message: BillingMessage(
+              'Bill saved, but failed to clear hold $activeHoldId: ${e.toString()}',
+              isError: true,
+            ),
+          );
+        }
+      }
     } catch (e) {
       state = state.copyWith(
         submitting: false,

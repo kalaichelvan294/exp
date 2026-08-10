@@ -50,6 +50,7 @@ class BillingState {
     this.discountMode = DiscountMode.percent,
     this.discountValue = 0,
     this.pendingBillId = '',
+    this.activeHoldId = '',
     this.editingBillId = '',
     this.editingCreatedAt = '',
     this.wholesaleAutoApply = true,
@@ -75,6 +76,7 @@ class BillingState {
   final DiscountMode discountMode;
   final num discountValue;
   final String pendingBillId;
+  final String activeHoldId;
 
   /// Non-empty when editing an existing saved bill (parity with the Electron
   /// billing-edit-controller). Drives update-vs-save on checkout.
@@ -120,6 +122,7 @@ class BillingState {
     DiscountMode? discountMode,
     num? discountValue,
     String? pendingBillId,
+    String? activeHoldId,
     String? editingBillId,
     String? editingCreatedAt,
     bool? wholesaleAutoApply,
@@ -143,6 +146,7 @@ class BillingState {
       discountMode: discountMode ?? this.discountMode,
       discountValue: discountValue ?? this.discountValue,
       pendingBillId: pendingBillId ?? this.pendingBillId,
+      activeHoldId: activeHoldId ?? this.activeHoldId,
       editingBillId: editingBillId ?? this.editingBillId,
       editingCreatedAt: editingCreatedAt ?? this.editingCreatedAt,
       wholesaleAutoApply: wholesaleAutoApply ?? this.wholesaleAutoApply,

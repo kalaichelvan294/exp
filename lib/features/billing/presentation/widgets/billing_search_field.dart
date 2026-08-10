@@ -17,7 +17,7 @@ import '../../domain/product.dart';
 ///
 /// Ports `search.js`: ↑/↓ move the highlight, Enter adds the best match,
 /// Esc closes the dropdown. The parent supplies the [focusNode] so global
-/// shortcuts (Alt+S / /) can focus it.
+/// shortcuts (Ctrl+S / /) can focus it.
 class BillingSearchField extends ConsumerStatefulWidget {
   const BillingSearchField({super.key, required this.focusNode});
 

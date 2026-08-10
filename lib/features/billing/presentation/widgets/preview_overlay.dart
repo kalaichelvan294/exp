@@ -38,8 +38,10 @@ class PreviewOverlay extends ConsumerWidget {
                 children: [
                   Text('Bill Preview', style: theme.textTheme.titleLarge),
                   const SizedBox(height: AppSpacing.x4),
-                  Text('Bill ID: ${state.pendingBillId}',
-                      style: theme.textTheme.bodySmall),
+                  Text(
+                    'Bill ID: ${state.pendingBillId}',
+                    style: theme.textTheme.bodySmall,
+                  ),
                   const Divider(height: AppSpacing.x24),
                   _itemsHeader(theme),
                   const Divider(height: 1),
@@ -59,35 +61,50 @@ class PreviewOverlay extends ConsumerWidget {
                 children: [
                   Text('Checkout', style: theme.textTheme.titleMedium),
                   const SizedBox(height: AppSpacing.x16),
-                  Text('Payment Mode',
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    'Payment Mode',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.x8),
                   Wrap(
                     spacing: AppSpacing.x16,
                     children: PaymentMode.values
-                        .map((m) => _radio<PaymentMode>(
-                              m.wire,
-                              m,
-                              state.paymentMode,
-                              (v) => c.setPaymentMode(v!),
-                            ))
+                        .map(
+                          (m) => _radio<PaymentMode>(
+                            m.wire,
+                            m,
+                            state.paymentMode,
+                            (v) => c.setPaymentMode(v!),
+                          ),
+                        )
                         .toList(),
                   ),
                   const Divider(height: AppSpacing.x32),
                   _summaryRow('Items', '${state.cart.length}', theme),
                   _summaryRow(
-                      'Subtotal', Money.format(totals.subtotalPaise), theme),
-                  _summaryRow('Discount',
-                      '-${Money.format(totals.discountPaise)}', theme),
+                    'Subtotal',
+                    Money.format(totals.subtotalPaise),
+                    theme,
+                  ),
+                  _summaryRow(
+                    'Discount',
+                    '-${Money.format(totals.discountPaise)}',
+                    theme,
+                  ),
                   const SizedBox(height: AppSpacing.x8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Total', style: theme.textTheme.titleMedium),
-                      Text(Money.format(totals.grandTotalPaise),
-                          style: const TextStyle(
-                              fontSize: 24, fontWeight: FontWeight.w700)),
+                      Text(
+                        Money.format(totals.grandTotalPaise),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
                   const Spacer(),
@@ -96,9 +113,11 @@ class PreviewOverlay extends ConsumerWidget {
                     child: ElevatedButton.icon(
                       onPressed: state.submitting ? null : c.checkout,
                       icon: const Icon(Icons.print, size: 18),
-                      label: Text(state.isEditing
-                          ? 'Update Bill (F4)'
-                          : 'Save & Print (F4)'),
+                      label: Text(
+                        state.isEditing
+                            ? 'Update Bill (Ctrl+P)'
+                            : 'Save & Print (Ctrl+P)',
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.x8),
@@ -132,15 +151,26 @@ class PreviewOverlay extends ConsumerWidget {
   }
 
   Widget _itemsHeader(ThemeData theme) {
-    final style = theme.textTheme.bodyMedium
-        ?.copyWith(fontWeight: FontWeight.w600, color: AppColors.neutral700);
+    final style = theme.textTheme.bodyMedium?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: AppColors.neutral700,
+    );
     return Row(
       children: [
         Expanded(flex: 1, child: Text('#', style: style)),
         Expanded(flex: 5, child: Text('Item', style: style)),
-        Expanded(flex: 2, child: Text('Qty/Wt', style: style, textAlign: TextAlign.right)),
-        Expanded(flex: 2, child: Text('Rate', style: style, textAlign: TextAlign.right)),
-        Expanded(flex: 2, child: Text('Total', style: style, textAlign: TextAlign.right)),
+        Expanded(
+          flex: 2,
+          child: Text('Qty/Wt', style: style, textAlign: TextAlign.right),
+        ),
+        Expanded(
+          flex: 2,
+          child: Text('Rate', style: style, textAlign: TextAlign.right),
+        ),
+        Expanded(
+          flex: 2,
+          child: Text('Total', style: style, textAlign: TextAlign.right),
+        ),
       ],
     );
   }
@@ -157,16 +187,23 @@ class PreviewOverlay extends ConsumerWidget {
               Expanded(flex: 1, child: Text('${index + 1}')),
               Expanded(flex: 5, child: Text(line.displayName)),
               Expanded(
-                  flex: 2,
-                  child: Text(line.qtyDisplay, textAlign: TextAlign.right)),
+                flex: 2,
+                child: Text(line.qtyDisplay, textAlign: TextAlign.right),
+              ),
               Expanded(
-                  flex: 2,
-                  child: Text(Money.format(line.ratePaise),
-                      textAlign: TextAlign.right)),
+                flex: 2,
+                child: Text(
+                  Money.format(line.ratePaise),
+                  textAlign: TextAlign.right,
+                ),
+              ),
               Expanded(
-                  flex: 2,
-                  child: Text(Money.format(line.lineTotalPaise),
-                      textAlign: TextAlign.right)),
+                flex: 2,
+                child: Text(
+                  Money.format(line.lineTotalPaise),
+                  textAlign: TextAlign.right,
+                ),
+              ),
             ],
           ),
         );
@@ -180,15 +217,26 @@ class PreviewOverlay extends ConsumerWidget {
       children: [
         _summaryRow('Subtotal', Money.format(totals.subtotalPaise), theme),
         _summaryRow(
-            'Discount', '-${Money.format(totals.discountPaise)}', theme),
-        _summaryRow('Grand Total', Money.format(totals.grandTotalPaise), theme,
-            emphasize: true),
+          'Discount',
+          '-${Money.format(totals.discountPaise)}',
+          theme,
+        ),
+        _summaryRow(
+          'Grand Total',
+          Money.format(totals.grandTotalPaise),
+          theme,
+          emphasize: true,
+        ),
       ],
     );
   }
 
-  Widget _summaryRow(String label, String value, ThemeData theme,
-      {bool emphasize = false}) {
+  Widget _summaryRow(
+    String label,
+    String value,
+    ThemeData theme, {
+    bool emphasize = false,
+  }) {
     final valueStyle = emphasize
         ? theme.textTheme.titleMedium
         : theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
