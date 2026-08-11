@@ -24,6 +24,7 @@ class SettingsState {
   const SettingsState({
     this.settings = const AppSettings(),
     this.invControlEnabled = false,
+    this.cleanupTrainingImagesAfterEmbedding = false,
     this.categories = const [],
     this.brands = const [],
     this.loaded = false,
@@ -32,6 +33,7 @@ class SettingsState {
 
   final AppSettings settings;
   final bool invControlEnabled;
+  final bool cleanupTrainingImagesAfterEmbedding;
 
   /// Working copies (user edits before saving item config).
   final List<String> categories;
@@ -43,6 +45,7 @@ class SettingsState {
   SettingsState copyWith({
     AppSettings? settings,
     bool? invControlEnabled,
+    bool? cleanupTrainingImagesAfterEmbedding,
     List<String>? categories,
     List<String>? brands,
     bool? loaded,
@@ -51,6 +54,9 @@ class SettingsState {
     return SettingsState(
       settings: settings ?? this.settings,
       invControlEnabled: invControlEnabled ?? this.invControlEnabled,
+      cleanupTrainingImagesAfterEmbedding:
+          cleanupTrainingImagesAfterEmbedding ??
+          this.cleanupTrainingImagesAfterEmbedding,
       categories: categories ?? this.categories,
       brands: brands ?? this.brands,
       loaded: loaded ?? this.loaded,

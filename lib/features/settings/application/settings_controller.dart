@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/appearance.dart';
 import '../../billing/domain/billing_enums.dart';
+import '../../image_search/data/product_embedding_repository.dart';
 import '../data/settings_repository.dart';
 import '../domain/app_settings.dart';
 import 'settings_state.dart';
@@ -25,6 +26,7 @@ class SettingsController extends Notifier<SettingsState> {
       state = state.copyWith(
         settings: settings,
         invControlEnabled: inv.invControlEnabled,
+        cleanupTrainingImagesAfterEmbedding: false,
         categories: List.of(settings.itemCategories),
         brands: List.of(settings.itemBrands),
         loaded: true,
@@ -121,6 +123,10 @@ class SettingsController extends Notifier<SettingsState> {
 
   void previewInventoryControl(bool enabled) {
     state = state.copyWith(invControlEnabled: enabled);
+  }
+
+  void previewEmbeddingCleanup(bool enabled) {
+    state = state.copyWith(cleanupTrainingImagesAfterEmbedding: enabled);
   }
 
   void previewItemConfig({
@@ -343,6 +349,27 @@ class SettingsController extends Notifier<SettingsState> {
       'Item configuration saved successfully!',
       'Failed to save item configuration',
     );
+  }
+
+  Future<void> refreshImageEmbeddings() async {
+    final rootPath = state.settings.itemImagesRootPath.trim();
+    if (rootPath.isEmpty) {
+      return _err('Item images root path is required before refreshing embeddings.');
+    }
+
+    try {
+      final result = await ref
+          .read(productEmbeddingRepositoryProvider)
+          .rebuildIndex(
+            imagesRootPath: rootPath,
+            cleanupTrainingImages: state.cleanupTrainingImagesAfterEmbedding,
+          );
+      _ok(
+        'Indexed ${result.productsIndexed} product(s) and ${result.imagesIndexed} image(s).',
+      );
+    } catch (e) {
+      _err('Failed to refresh embeddings: ${e.toString()}');
+    }
   }
 
   /// Restores the working category/brand lists from the last-saved settings

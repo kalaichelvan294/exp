@@ -44,8 +44,10 @@ CREATE TABLE product_embeddings (
     embedding_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     product_id VARCHAR(255) NOT NULL, -- plain reference, no FK
     image_url VARCHAR(255) NOT NULL,
-    embedding JSON NOT NULL, 
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    embedding JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_product_image (product_id, image_url),
+    KEY idx_product_embeddings_product_id (product_id)
 );
 
 CREATE TABLE bills (
@@ -240,6 +242,11 @@ SET @grant_app_settings = CONCAT(
   'GRANT SELECT, INSERT, UPDATE, DELETE ON `', @db_name, '`.`app_settings` TO ''pos_app_user''@''%'''
 );
 PREPARE stmt FROM @grant_app_settings; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @grant_product_embeddings = CONCAT(
+  'GRANT SELECT, INSERT, UPDATE, DELETE ON `', @db_name, '`.`product_embeddings` TO ''pos_app_user''@''%'''
+);
+PREPARE stmt FROM @grant_product_embeddings; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @grant_inventory_settings = CONCAT(
   'GRANT SELECT, INSERT, UPDATE, DELETE ON `', @db_name, '`.`inventory_settings` TO ''pos_app_user''@''%'''

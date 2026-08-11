@@ -37,6 +37,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   int _adminTimeoutSeconds = 300;
   bool _invEnabled = false;
   bool _wholesaleAutoApply = true;
+  bool _cleanupTrainingImagesAfterEmbedding = false;
   final Set<PaymentMode> _paymentModes = {};
   _SettingsSection _activeSection = _SettingsSection.storeProfile;
   bool _adminTimeoutDirty = false;
@@ -71,6 +72,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _themeMode = s.themeMode;
     _invEnabled = state.invControlEnabled;
     _wholesaleAutoApply = s.itemsWholesaleAutoApply;
+    _cleanupTrainingImagesAfterEmbedding =
+        state.cleanupTrainingImagesAfterEmbedding;
     _itemImagesRootPath.text = s.itemImagesRootPath;
     _paymentModes
       ..clear()
@@ -545,8 +548,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         setState(() {
           final settings = ref.read(settingsControllerProvider).settings;
           _wholesaleAutoApply = settings.itemsWholesaleAutoApply;
+          _cleanupTrainingImagesAfterEmbedding = false;
           _itemImagesRootPath.text = settings.itemImagesRootPath;
         });
+        _c.previewEmbeddingCleanup(false);
       },
       onSave: () => _c.saveItemConfig(
         wholesaleAutoApply: _wholesaleAutoApply,
@@ -571,10 +576,41 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         const SizedBox(height: AppSpacing.x6),
         Text(
-          'Images are saved as <SKU>_master.jpg and loaded from this root.',
+          'Training images use <SKU>_master plus _1 through _5 in JPG, JPEG, or PNG format.',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.neutral500),
+        ),
+        const SizedBox(height: AppSpacing.x20),
+        Text('Image Embeddings', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.x8),
+        Row(
+          children: [
+            Expanded(
+              child: CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                title: const Text(
+                  'Delete numbered training images after indexing',
+                ),
+                subtitle: const Text('Keeps the master image in place.'),
+                value: _cleanupTrainingImagesAfterEmbedding,
+                onChanged: (v) => setState(() {
+                  _cleanupTrainingImagesAfterEmbedding = v ?? false;
+                  _c.previewEmbeddingCleanup(
+                    _cleanupTrainingImagesAfterEmbedding,
+                  );
+                }),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.x12),
+            FilledButton.icon(
+              onPressed: _c.refreshImageEmbeddings,
+              icon: const Icon(Icons.auto_awesome, size: 16),
+              label: const Text('Refresh embeddings'),
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.x20),
         Text('Categories', style: Theme.of(context).textTheme.titleMedium),
@@ -726,8 +762,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const Text('Inventory Control: Toggle inventory tracking.'),
         const Text(
           'Item Configuration: Manage image root path, categories, brands, '
-          'brand propagation, and wholesale auto-apply. '
-          'Item images follow <SKU>_master.jpg (JPG/JPEG).',
+          'brand propagation, wholesale auto-apply, and image embeddings.',
         ),
         const SizedBox(height: AppSpacing.x20),
         Text(

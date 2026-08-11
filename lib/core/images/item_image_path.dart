@@ -15,6 +15,24 @@ class ItemImagePath {
 
   static String fileNameForSku(String sku) => '${sku.trim()}_master.jpg';
 
+  static String trainingFileNameForSku(
+    String sku,
+    String variant, {
+    String extension = 'jpg',
+  }) {
+    return '${sku.trim()}_${variant.trim()}.$extension';
+  }
+
+  static Iterable<String> trainingFileNamesForSku(String sku) sync* {
+    const variants = ['master', '1', '2', '3', '4', '5'];
+    const extensions = ['jpg', 'jpeg', 'png'];
+    for (final variant in variants) {
+      for (final extension in extensions) {
+        yield trainingFileNameForSku(sku, variant, extension: extension);
+      }
+    }
+  }
+
   static ItemImageLocation resolve({
     required String sku,
     required String configuredRootPath,

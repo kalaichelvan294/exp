@@ -1,4 +1,5 @@
 import 'billing_enums.dart';
+import '../../../core/images/item_image_path.dart';
 
 /// A searchable product returned by the API bridge.
 ///
@@ -44,6 +45,9 @@ class Product {
   String get displayName => nameTa.isNotEmpty ? '$nameTa / $name' : name;
 
   String get imageFileName => '${sku.trim()}_master.jpg';
+
+  Iterable<String> get trainingImageFileNames =>
+      ItemImagePath.trainingFileNamesForSku(sku);
 
   num get currentStock =>
       pricingType == PricingType.weight ? invCurrentWeight : invCurrentQty;

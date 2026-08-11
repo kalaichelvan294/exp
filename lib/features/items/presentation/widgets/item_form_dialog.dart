@@ -294,7 +294,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 220,
+            height: 180,
             child: ClipRRect(
               borderRadius: AppRadius.input,
               child: _selectedImagePath.trim().isNotEmpty

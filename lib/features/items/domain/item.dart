@@ -1,4 +1,5 @@
 import '../../billing/domain/billing_enums.dart';
+import '../../../core/images/item_image_path.dart';
 
 /// A catalog item as returned by the Electron `items:list` handler. Field names
 /// mirror the sqlite/postgres adapter projection (camelCase for item metadata,
@@ -43,6 +44,9 @@ class Item {
   String get displayName => nameTa.trim().isNotEmpty
       ? '${nameTa.trim()} / ${name.trim()}'
       : name.trim();
+
+  Iterable<String> get trainingImageFileNames =>
+      ItemImagePath.trainingFileNamesForSku(sku);
 
   /// "quantity" for UNIT items, "weight" for WEIGHT items.
   String get trackType =>

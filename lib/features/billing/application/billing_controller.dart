@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:camera/camera.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../printing/data/receipt_print_service.dart';
 import '../../printing/domain/preview_outcome.dart';
 import '../../printing/domain/receipt_html_builder.dart';
 import '../../printing/domain/receipt_models.dart';
+import '../../image_search/data/product_embedding_repository.dart';
 import '../../settings/data/settings_repository.dart';
 import '../../settings/domain/app_settings.dart';
 import '../data/billing_repository.dart';
@@ -27,16 +30,25 @@ const _maxHolds = 3;
 class BillingController extends Notifier<BillingState> {
   Timer? _searchDebounce0;
   int _searchToken = 0;
+  CameraController? _cameraController;
 
   BillingRepository get _repo => ref.read(billingRepositoryProvider);
 
   @override
   BillingState build() {
-    ref.onDispose(() => _searchDebounce0?.cancel());
+    ref.onDispose(() {
+      _searchDebounce0?.cancel();
+      final controller = _cameraController;
+      _cameraController = null;
+      if (controller != null) {
+        unawaited(controller.dispose());
+      }
+    });
     // Kick off async side-loads without blocking first frame.
     Future.microtask(() async {
       await loadHeldBills();
       await loadRecentBills();
+      await ensureCameraReady();
     });
     return const BillingState();
   }
@@ -77,6 +89,154 @@ class BillingController extends Notifier<BillingState> {
         searching: false,
         message: BillingMessage(
           'Search failed: ${e.toString()}',
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> ensureCameraReady() async {
+    if (!Platform.isWindows) {
+      state = state.copyWith(
+        cameraConnected: false,
+        cameraLive: false,
+        cameraBusy: false,
+        cameraStatus: 'Camera is Windows-only',
+      );
+      return;
+    }
+
+    final existing = _cameraController;
+    if (existing != null && existing.value.isInitialized) {
+      state = state.copyWith(
+        cameraConnected: true,
+        cameraLive: true,
+        cameraBusy: state.cameraBusy,
+        cameraStatus: 'Camera live',
+      );
+      return;
+    }
+
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        state = state.copyWith(
+          cameraConnected: false,
+          cameraLive: false,
+          cameraBusy: false,
+          cameraStatus: 'No camera detected',
+        );
+        return;
+      }
+
+      final controller = CameraController(
+        cameras.first,
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+      await controller.initialize();
+      final previous = _cameraController;
+      _cameraController = controller;
+      if (previous != null) {
+        unawaited(previous.dispose());
+      }
+      state = state.copyWith(
+        cameraConnected: true,
+        cameraLive: true,
+        cameraBusy: state.cameraBusy,
+        cameraStatus: 'Camera live',
+      );
+    } on CameraException catch (e) {
+      state = state.copyWith(
+        cameraConnected: false,
+        cameraLive: false,
+        cameraBusy: false,
+        cameraStatus: 'Camera unavailable',
+        message: BillingMessage(
+          'Camera setup failed: ${e.toString()}',
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> captureCameraSearch() async {
+    state = state.copyWith(cameraBusy: true, cameraStatus: 'Capturing frame...');
+    try {
+      await ensureCameraReady();
+      final controller = _cameraController;
+      if (controller == null || !controller.value.isInitialized) {
+        state = state.copyWith(
+          cameraBusy: false,
+          cameraLive: false,
+          cameraStatus: 'Camera unavailable',
+        );
+        return;
+      }
+
+      final capture = await controller.takePicture();
+      final embeddingRepo = ref.read(productEmbeddingRepositoryProvider);
+      final barcode = await embeddingRepo.decodeBarcodeFromImageFile(
+        File(capture.path),
+      );
+      final normalizedBarcode = barcode?.trim() ?? '';
+      final barcodeMatch = normalizedBarcode.isEmpty
+          ? null
+          : await _repo.findExactProduct(normalizedBarcode);
+      final match = barcodeMatch != null
+          ? ImageSearchMatch(
+              product: barcodeMatch,
+              similarity: 1,
+              imageUrl: 'barcode:$normalizedBarcode',
+            )
+          : await embeddingRepo.findBestMatchFromImageFile(File(capture.path));
+      if (match == null) {
+        state = state.copyWith(
+          query: '',
+          matches: const [],
+          selectedMatchIndex: -1,
+          searchDropdownOpen: true,
+          cameraBusy: false,
+          cameraStatus: 'No match found',
+          message: const BillingMessage('No product matched the camera image.'),
+        );
+        return;
+      }
+
+        state = state.copyWith(
+          query: '',
+          matches: [match.product],
+          selectedMatchIndex: 0,
+          searchDropdownOpen: true,
+          cameraBusy: false,
+          cameraStatus: barcodeMatch != null
+              ? 'Barcode match: ${match.product.displayName}'
+              : 'Best match: ${match.product.displayName}',
+          message: BillingMessage(
+            barcodeMatch != null
+                ? 'Barcode match: ${match.product.displayName}'
+                : 'Camera match: ${match.product.displayName} '
+                    '(${(match.similarity * 100).toStringAsFixed(1)}%)',
+          ),
+        );
+    } on CameraException catch (e) {
+      state = state.copyWith(
+        cameraBusy: false,
+        cameraLive: false,
+        cameraStatus: 'Camera search failed',
+        message: BillingMessage(
+          'Camera search failed: ${e.description ?? e.toString()}',
+          isError: true,
+        ),
+      );
+    } on StateError catch (e) {
+      state = state.copyWith(
+        cameraBusy: false,
+        cameraLive: false,
+        cameraStatus: 'Camera search failed',
+        message: BillingMessage(
+          'Camera search failed: ${e.toString()}',
           isError: true,
         ),
       );

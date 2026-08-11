@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/images/item_image_path.dart';
 import '../../../../core/theme/app_tokens.dart';
+import '../../application/billing_state.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../application/billing_controller.dart';
 import '../../domain/billing_enums.dart';
@@ -156,27 +157,36 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Focus(
-          onKeyEvent: _onKey,
-          child: CompositedTransformTarget(
-            key: _searchFieldKey,
-            link: _layerLink,
-            child: TextField(
-              controller: _controller,
-              focusNode: widget.focusNode,
-              autofocus: true,
-              onChanged: _c.onQueryChanged,
-              onTap: () => _c.setSearchDropdownOpen(true),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(
-                  Icons.search,
-                  size: 18,
-                  color: AppColors.neutral500,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Focus(
+                onKeyEvent: _onKey,
+                child: CompositedTransformTarget(
+                  key: _searchFieldKey,
+                  link: _layerLink,
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: widget.focusNode,
+                    autofocus: true,
+                    onChanged: _c.onQueryChanged,
+                    onTap: () => _c.setSearchDropdownOpen(true),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(
+                        Icons.search,
+                        size: 18,
+                        color: AppColors.neutral500,
+                      ),
+                      hintText: 'Search Item / SKU (/)',
+                    ),
+                  ),
                 ),
-                hintText: 'Search Item / SKU (/)',
               ),
             ),
-          ),
+            const SizedBox(width: AppSpacing.x8),
+            _CameraStatusChip(state: state),
+          ],
         ),
         const SizedBox(height: AppSpacing.x4),
         _SearchHint(),
@@ -218,7 +228,7 @@ class _ResultsGrid extends ConsumerWidget {
           crossAxisCount: columns,
           mainAxisSpacing: AppSpacing.x12,
           crossAxisSpacing: AppSpacing.x12,
-          childAspectRatio: 1.06,
+          childAspectRatio: 1.22,
         ),
         itemCount: matches.length,
         itemBuilder: (context, index) {
@@ -311,7 +321,7 @@ class _ResultsGrid extends ConsumerWidget {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.all(AppSpacing.x8),
+                      padding: const EdgeInsets.all(AppSpacing.x6),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -378,6 +388,10 @@ class _SearchHint extends ConsumerWidget {
     String text;
     if (state.message.text.isNotEmpty) {
       text = state.message.text;
+    } else if (state.cameraBusy) {
+      text = state.cameraStatus;
+    } else if (state.query.isEmpty && state.cameraLive) {
+      text = 'Camera live. Tap the chip to capture the best match.';
     } else if (state.query.isEmpty) {
       text = 'Type item name or SKU. Press Enter to add best match.';
     } else if (state.searching) {
@@ -393,6 +407,74 @@ class _SearchHint extends ConsumerWidget {
         color: state.message.isError
             ? AppColors.error500
             : AppColors.neutral500,
+      ),
+    );
+  }
+}
+
+class _CameraStatusChip extends ConsumerWidget {
+  const _CameraStatusChip({required this.state});
+
+  final BillingState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ref.read(billingControllerProvider.notifier);
+    final live = state.cameraLive && !state.cameraBusy;
+    final bg = state.cameraBusy
+        ? AppColors.warning500.withValues(alpha: 0.16)
+        : live
+            ? AppColors.success500.withValues(alpha: 0.16)
+            : AppColors.neutral100;
+    final fg = state.cameraBusy
+        ? AppColors.warning500
+        : live
+            ? AppColors.success500
+            : AppColors.neutral600;
+    final icon = state.cameraBusy
+        ? Icons.hourglass_top
+        : live
+            ? Icons.videocam
+            : Icons.videocam_off;
+
+    return Tooltip(
+      message: state.cameraStatus,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: c.captureCameraSearch,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: live ? AppColors.success500 : AppColors.neutral300,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x12,
+              vertical: AppSpacing.x8,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: fg),
+                const SizedBox(width: AppSpacing.x6),
+                Text(
+                  state.cameraBusy
+                      ? 'Scanning...'
+                      : live
+                          ? 'Camera live'
+                          : 'Camera offline',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

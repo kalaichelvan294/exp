@@ -43,6 +43,10 @@ class BillingState {
     this.matches = const [],
     this.selectedMatchIndex = -1,
     this.searchDropdownOpen = false,
+    this.cameraConnected = false,
+    this.cameraLive = false,
+    this.cameraBusy = false,
+    this.cameraStatus = 'Camera unavailable',
     this.cart = const [],
     this.selectedCartIndex = -1,
     this.qtyFocusRequestToken = 0,
@@ -67,6 +71,10 @@ class BillingState {
   final List<Product> matches;
   final int selectedMatchIndex;
   final bool searchDropdownOpen;
+  final bool cameraConnected;
+  final bool cameraLive;
+  final bool cameraBusy;
+  final String cameraStatus;
 
   final List<CartLine> cart;
   final int selectedCartIndex;
@@ -115,6 +123,10 @@ class BillingState {
     List<Product>? matches,
     int? selectedMatchIndex,
     bool? searchDropdownOpen,
+    bool? cameraConnected,
+    bool? cameraLive,
+    bool? cameraBusy,
+    String? cameraStatus,
     List<CartLine>? cart,
     int? selectedCartIndex,
     int? qtyFocusRequestToken,
@@ -139,6 +151,10 @@ class BillingState {
       matches: matches ?? this.matches,
       selectedMatchIndex: selectedMatchIndex ?? this.selectedMatchIndex,
       searchDropdownOpen: searchDropdownOpen ?? this.searchDropdownOpen,
+      cameraConnected: cameraConnected ?? this.cameraConnected,
+      cameraLive: cameraLive ?? this.cameraLive,
+      cameraBusy: cameraBusy ?? this.cameraBusy,
+      cameraStatus: cameraStatus ?? this.cameraStatus,
       cart: cart ?? this.cart,
       selectedCartIndex: selectedCartIndex ?? this.selectedCartIndex,
       qtyFocusRequestToken: qtyFocusRequestToken ?? this.qtyFocusRequestToken,
