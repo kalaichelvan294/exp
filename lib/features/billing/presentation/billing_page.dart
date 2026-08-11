@@ -98,12 +98,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     if (event.logicalKey == LogicalKeyboardKey.slash ||
         event.character == '/') {
-      // Trigger camera search instantly or focus search if camera is turned off
-      if (state.cameraTurnedOff || !Platform.isWindows) {
-        _focusSearch();
-      } else {
-        // Trigger instant camera search (async)
-        unawaited(_c.toggleCameraMode());
+      // "/" always focuses search bar first
+      _focusSearch();
+      // If camera is on and Windows, also start camera search
+      if (!state.cameraTurnedOff && Platform.isWindows) {
+        unawaited(_c.captureCameraSearch());
       }
       return KeyEventResult.handled;
     }

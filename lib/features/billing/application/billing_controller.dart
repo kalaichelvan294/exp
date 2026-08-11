@@ -34,6 +34,7 @@ class BillingController extends Notifier<BillingState> {
   Timer? _cameraFrameProcessingDebounce;
   DateTime _lastProcessedFrameTime = DateTime(2000);
   int _frameSkipCounter = 0;
+  Future<void>? _cameraInitFuture; // Prevent concurrent initialization
   static const _frameSkipCount = 2; // Process every 3rd frame (skip 2)
   static const _minFrameProcessingInterval = Duration(milliseconds: 500);
 
@@ -115,9 +116,14 @@ class BillingController extends Notifier<BillingState> {
   }
 
   /// Initialize camera for a specific capture mode.
-  /// Mode 'searching' = capture one frame and search
-  /// Mode 'preview' = keep camera live for modal preview
+  /// Uses a guard to prevent concurrent initialization attempts.
   Future<void> _initCameraForMode(CameraCaptureMode mode) async {
+    // Prevent concurrent initialization
+    if (_cameraInitFuture != null) {
+      await _cameraInitFuture;
+      return;
+    }
+
     if (!Platform.isWindows || state.cameraTurnedOff) {
       state = state.copyWith(
         cameraConnected: false,
@@ -127,11 +133,10 @@ class BillingController extends Notifier<BillingState> {
       return;
     }
 
-    // Already initialized and in the right mode
-    if (_cameraController != null && 
-        _cameraController!.value.isInitialized &&
-        state.cameraCaptureMode == mode) {
+    // Already initialized - reuse it
+    if (_cameraController != null && _cameraController!.value.isInitialized) {
       state = state.copyWith(
+        cameraCaptureMode: mode,
         cameraConnected: true,
         cameraBusy: false,
         cameraStatus: 'Camera live',
@@ -139,6 +144,22 @@ class BillingController extends Notifier<BillingState> {
       return;
     }
 
+    // Start initialization
+    _cameraInitFuture = _doInitializeCamera();
+    try {
+      await _cameraInitFuture;
+      state = state.copyWith(
+        cameraCaptureMode: mode,
+        cameraConnected: true,
+        cameraBusy: false,
+        cameraStatus: 'Camera live',
+      );
+    } finally {
+      _cameraInitFuture = null;
+    }
+  }
+
+  Future<void> _doInitializeCamera() async {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -150,27 +171,28 @@ class BillingController extends Notifier<BillingState> {
         return;
       }
 
+      // Double-check: if already initialized during await, don't create again
+      if (_cameraController != null && _cameraController!.value.isInitialized) {
+        return;
+      }
+
       final controller = CameraController(
         cameras.first,
         ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
+      
+      // Initialize the new controller
       await controller.initialize();
       
-      // Dispose old controller and set new one
-      final previous = _cameraController;
-      _cameraController = controller;
-      if (previous != null && previous != controller) {
-        unawaited(previous.dispose());
+      // Only set if we haven't already initialized during this call
+      if (_cameraController == null || !_cameraController!.value.isInitialized) {
+        _cameraController = controller;
+      } else {
+        // We have a race condition - dispose the new one
+        unawaited(controller.dispose());
       }
-      
-      state = state.copyWith(
-        cameraCaptureMode: mode,
-        cameraConnected: true,
-        cameraBusy: false,
-        cameraStatus: 'Camera live',
-      );
     } on CameraException catch (e) {
       state = state.copyWith(
         cameraConnected: false,
@@ -303,7 +325,6 @@ class BillingController extends Notifier<BillingState> {
           cameraStatus: 'No match found',
           message: const BillingMessage('No product matched the camera image.'),
         );
-        _disposeCameraIfNeeded();
         return;
       }
 
@@ -324,7 +345,6 @@ class BillingController extends Notifier<BillingState> {
                   '(${(match.similarity * 100).toStringAsFixed(1)}%)',
         ),
       );
-      _disposeCameraIfNeeded();
     } on CameraException catch (e) {
       state = state.copyWith(
         cameraBusy: false,
@@ -336,7 +356,6 @@ class BillingController extends Notifier<BillingState> {
           isError: true,
         ),
       );
-      _disposeCameraIfNeeded();
     } on StateError catch (e) {
       state = state.copyWith(
         cameraBusy: false,
@@ -360,7 +379,6 @@ class BillingController extends Notifier<BillingState> {
           isError: true,
         ),
       );
-      _disposeCameraIfNeeded();
     }
   }
 
@@ -510,8 +528,8 @@ class BillingController extends Notifier<BillingState> {
       cameraStatus: newState ? 'Camera turned off' : 'Camera turned on',
     );
     if (newState) {
-      // Dispose when turning off
-      _disposeCameraIfNeeded();
+      // Camera turned off - stop using it but keep alive
+      // (will be disposed only on page exit)
     } else if (state.cameraModalVisible) {
       // Re-initialize if modal is still open
       unawaited(_initCameraForMode(CameraCaptureMode.preview));
