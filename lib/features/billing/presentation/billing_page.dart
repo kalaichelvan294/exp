@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:io';
 
 import '../../../app/app_routes.dart';
 import '../../../app/module_scaffold.dart';
@@ -10,6 +11,7 @@ import '../../../shared/widgets/app_card.dart';
 import '../application/billing_controller.dart';
 import '../domain/money.dart';
 import 'widgets/billing_search_field.dart';
+import 'widgets/camera_control_modal.dart';
 import 'widgets/cart_table.dart';
 import 'widgets/checkout_panel.dart';
 import 'widgets/preview_overlay.dart';
@@ -95,7 +97,12 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     if (event.logicalKey == LogicalKeyboardKey.slash ||
         event.character == '/') {
-      _focusSearch();
+      // Toggle camera mode or focus search if camera is turned off
+      if (state.cameraTurnedOff || !Platform.isWindows) {
+        _focusSearch();
+      } else {
+        _c.toggleCameraMode();
+      }
       return KeyEventResult.handled;
     }
 
@@ -127,6 +134,23 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     final previewVisible = ref.watch(
       billingControllerProvider.select((s) => s.previewVisible),
     );
+    final cameraModalVisible = ref.watch(
+      billingControllerProvider.select((s) => s.cameraModalVisible),
+    );
+    final billingState = ref.watch(billingControllerProvider);
+
+    // Show camera modal if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (cameraModalVisible && Navigator.canPop(context) == false) {
+        showDialog(
+          context: context,
+          builder: (ctx) =>
+              CameraControlModal(state: billingState),
+        ).then((_) {
+          ref.read(billingControllerProvider.notifier).closeCameraModal();
+        });
+      }
+    });
 
     return Focus(
       autofocus: true,

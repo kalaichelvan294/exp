@@ -224,6 +224,7 @@ class BillingController extends Notifier<BillingState> {
       state = state.copyWith(
         cameraBusy: false,
         cameraLive: false,
+        cameraError: e.description ?? e.toString(),
         cameraStatus: 'Camera search failed',
         message: BillingMessage(
           'Camera search failed: ${e.description ?? e.toString()}',
@@ -234,6 +235,18 @@ class BillingController extends Notifier<BillingState> {
       state = state.copyWith(
         cameraBusy: false,
         cameraLive: false,
+        cameraError: e.toString(),
+        cameraStatus: 'Camera search failed',
+        message: BillingMessage(
+          'Camera search failed: ${e.toString()}',
+          isError: true,
+        ),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        cameraBusy: false,
+        cameraLive: false,
+        cameraError: e.toString(),
         cameraStatus: 'Camera search failed',
         message: BillingMessage(
           'Camera search failed: ${e.toString()}',
@@ -241,6 +254,40 @@ class BillingController extends Notifier<BillingState> {
         ),
       );
     }
+  }
+
+  /// Toggles camera mode on/off when "/" key is pressed.
+  /// If camera is turned off, this won't do anything (user must open modal to re-enable).
+  void toggleCameraMode() {
+    if (state.cameraTurnedOff) {
+      // Camera is turned off, ignore toggle
+      return;
+    }
+    state = state.copyWith(
+      cameraLive: !state.cameraLive,
+      cameraBusy: false,
+      cameraStatus: state.cameraLive ? 'Camera stopped' : 'Camera live',
+    );
+  }
+
+  /// Opens the camera control modal.
+  void openCameraModal() {
+    state = state.copyWith(cameraModalVisible: true);
+  }
+
+  /// Closes the camera control modal.
+  void closeCameraModal() {
+    state = state.copyWith(cameraModalVisible: false);
+  }
+
+  /// Toggles camera off/on via the modal. When turned off, "/" key won't work.
+  void toggleCameraOff() {
+    state = state.copyWith(
+      cameraTurnedOff: !state.cameraTurnedOff,
+      cameraLive: false,
+      cameraBusy: false,
+      cameraStatus: state.cameraTurnedOff ? 'Camera turned on' : 'Camera turned off',
+    );
   }
 
   /// Re-runs the current search and opens the dropdown (global / focus action).

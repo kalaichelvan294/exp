@@ -6,6 +6,7 @@ import '../../../core/database/db_connection.dart';
 import '../../../core/database/db_providers.dart';
 import '../domain/bill_id.dart';
 import '../domain/bill_data.dart';
+import '../domain/billing_enums.dart';
 import '../domain/product.dart';
 
 /// Result of a save/hold operation.
@@ -131,6 +132,171 @@ class BillingRepository {
     );
   }
 
+  /// Deducts inventory for each item in the bill based on pricingType.
+  /// Updates inv_current_qty for unit items, inv_current_weight for weight items.
+  /// Allows inventory to go negative (no validation).
+  Future<void> _deductInventoryForBill(BillData bill) async {
+    for (final item in bill.items) {
+      final escapedId = item.id.replaceAll("'", "''");
+      if (item.pricingType.wire == 'weight') {
+        await _db.execute(
+          'UPDATE products SET inv_current_weight = inv_current_weight - ${item.qty} '
+          "WHERE id = '$escapedId'",
+        );
+      } else {
+        await _db.execute(
+          'UPDATE products SET inv_current_qty = inv_current_qty - ${item.qty} '
+          "WHERE id = '$escapedId'",
+        );
+      }
+    }
+  }
+
+  /// Gets the old bill data to calculate inventory delta on update.
+  Future<BillData?> _getBillDataById(String billId) async {
+    final escapedBillId = billId.replaceAll("'", "''");
+    final rows = await _db.query(
+      "SELECT bill_data FROM bills WHERE bill_id = '$escapedBillId' LIMIT 1",
+    );
+    if (rows.isEmpty) return null;
+    final data = _asMap(rows.first['bill_data'] ?? rows.first['billData']);
+    return _parseBillDataFromJson(data);
+  }
+
+  /// Parses BillData from JSON (minimal parsing to get items).
+  BillData? _parseBillDataFromJson(Map<String, dynamic> json) {
+    try {
+      final items = (json['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final billItems = items.map((item) {
+        return BillItem(
+          id: (item['id'] ?? '').toString(),
+          sku: (item['sku'] ?? '').toString(),
+          name: (item['name'] ?? '').toString(),
+          nameTa: (item['nameTa'] ?? '').toString(),
+          brandName: (item['brandName'] ?? '').toString(),
+          category: (item['category'] ?? 'UNCATEGORIZED').toString(),
+          pricingType: (item['pricingType'] ?? 'unit') == 'weight'
+              ? PricingType.weight
+              : PricingType.unit,
+          qty: (item['qty'] is num) ? item['qty'] : num.tryParse('${item['qty']}') ?? 0,
+          retailPricePaise: (item['retailPricePaise'] is num)
+              ? (item['retailPricePaise'] as num).toInt()
+              : int.tryParse('${item['retailPricePaise']}') ?? 0,
+          wholesalePricePaise: (item['wholesalePricePaise'] is num)
+              ? (item['wholesalePricePaise'] as num).toInt()
+              : int.tryParse('${item['wholesalePricePaise']}'),
+          wholesaleMinQty: (item['wholesaleMinQty'] is num)
+              ? item['wholesaleMinQty']
+              : num.tryParse('${item['wholesaleMinQty']}'),
+          priceTier: (item['priceTier'] ?? 'retail') == 'wholesale'
+              ? PriceTier.wholesale
+              : PriceTier.retail,
+          ratePaise: (item['rate'] is num)
+              ? (item['rate'] as num).toInt()
+              : int.tryParse('${item['rate']}') ?? 0,
+          lineTotalPaise: (item['lineTotalPaise'] is num)
+              ? (item['lineTotalPaise'] as num).toInt()
+              : int.tryParse('${item['lineTotalPaise']}') ?? 0,
+        );
+      }).toList();
+
+      return BillData(
+        billId: (json['billId'] ?? '').toString(),
+        paymentMode: PaymentMode.fromWire(json['paymentMode'] ?? 'CASH'),
+        discountMode: DiscountMode.fromWire(json['discountMode'] ?? 'PERCENT'),
+        discountValue: (json['discountValue'] is num)
+            ? json['discountValue']
+            : num.tryParse('${json['discountValue']}') ?? 0,
+        itemCount: (json['itemCount'] is num)
+            ? (json['itemCount'] as num).toInt()
+            : int.tryParse('${json['itemCount']}') ?? 0,
+        subtotalPaise: (json['subtotalPaise'] is num)
+            ? (json['subtotalPaise'] as num).toInt()
+            : int.tryParse('${json['subtotalPaise']}') ?? 0,
+        discountPaise: (json['discountPaise'] is num)
+            ? (json['discountPaise'] as num).toInt()
+            : int.tryParse('${json['discountPaise']}') ?? 0,
+        grandTotalPaise: (json['grandTotalPaise'] is num)
+            ? (json['grandTotalPaise'] as num).toInt()
+            : int.tryParse('${json['grandTotalPaise']}') ?? 0,
+        items: billItems,
+        createdAt: (json['createdAt'] ?? '').toString(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Calculates and applies the inventory delta between old and new bill.
+  /// Reverts the old inventory and applies the new inventory.
+  Future<void> _applyInventoryDelta(String billId, BillData newBill) async {
+    final oldBill = await _getBillDataById(billId);
+    if (oldBill == null) {
+      // If we can't get old bill, just deduct new bill normally
+      await _deductInventoryForBill(newBill);
+      return;
+    }
+
+    // Build a map of old quantities by product id
+    final oldQtyMap = <String, (num, String)>{};
+    for (final item in oldBill.items) {
+      oldQtyMap[item.id] = (item.qty, item.pricingType.wire);
+    }
+
+    // Process new bill items: revert old, apply new
+    for (final item in newBill.items) {
+      final escapedId = item.id.replaceAll("'", "''");
+      if (oldQtyMap.containsKey(item.id)) {
+        final (oldQty, pricingType) = oldQtyMap[item.id]!;
+        final delta = item.qty - oldQty;
+        if (item.pricingType.wire == 'weight') {
+          await _db.execute(
+            'UPDATE products SET inv_current_weight = inv_current_weight - $delta '
+            "WHERE id = '$escapedId'",
+          );
+        } else {
+          await _db.execute(
+            'UPDATE products SET inv_current_qty = inv_current_qty - $delta '
+            "WHERE id = '$escapedId'",
+          );
+        }
+      } else {
+        // New item in the bill, deduct full amount
+        if (item.pricingType.wire == 'weight') {
+          await _db.execute(
+            'UPDATE products SET inv_current_weight = inv_current_weight - ${item.qty} '
+            "WHERE id = '$escapedId'",
+          );
+        } else {
+          await _db.execute(
+            'UPDATE products SET inv_current_qty = inv_current_qty - ${item.qty} '
+            "WHERE id = '$escapedId'",
+          );
+        }
+      }
+    }
+
+    // Handle removed items (items in old but not in new)
+    final newIdSet = newBill.items.map((item) => item.id).toSet();
+    for (final entry in oldQtyMap.entries) {
+      if (!newIdSet.contains(entry.key)) {
+        final (oldQty, pricingType) = entry.value;
+        final escapedId = entry.key.replaceAll("'", "''");
+        if (pricingType == 'weight') {
+          await _db.execute(
+            'UPDATE products SET inv_current_weight = inv_current_weight + $oldQty '
+            "WHERE id = '$escapedId'",
+          );
+        } else {
+          await _db.execute(
+            'UPDATE products SET inv_current_qty = inv_current_qty + $oldQty '
+            "WHERE id = '$escapedId'",
+          );
+        }
+      }
+    }
+  }
+
   Future<List<Product>> searchProducts(String query, {int limit = 8}) async {
     final escapedQuery = query.replaceAll("'", "''").toLowerCase();
     final rows = await _db.query(
@@ -149,6 +315,7 @@ class BillingRepository {
 
   Future<SaveBillResult> saveBill(BillData bill) async {
     await _insertBill(bill);
+    await _deductInventoryForBill(bill);
     return SaveBillResult(billId: bill.billId);
   }
 
@@ -239,6 +406,7 @@ class BillingRepository {
 
   Future<void> updateBill(String billId, BillData bill) async {
     await _updateBill(billId, bill);
+    await _applyInventoryDelta(billId, bill);
   }
 
   Future<void> deleteBill(String billId) async {

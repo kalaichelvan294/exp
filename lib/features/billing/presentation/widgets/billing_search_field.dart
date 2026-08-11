@@ -420,34 +420,60 @@ class _CameraStatusChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = ref.read(billingControllerProvider.notifier);
-    final live = state.cameraLive && !state.cameraBusy;
-    final bg = state.cameraBusy
-        ? AppColors.warning500.withValues(alpha: 0.16)
-        : live
-            ? AppColors.success500.withValues(alpha: 0.16)
-            : AppColors.neutral100;
-    final fg = state.cameraBusy
-        ? AppColors.warning500
-        : live
-            ? AppColors.success500
-            : AppColors.neutral600;
-    final icon = state.cameraBusy
-        ? Icons.hourglass_top
-        : live
-            ? Icons.videocam
-            : Icons.videocam_off;
+    
+    // Determine color and icon based on state
+    Color bg;
+    Color fg;
+    IconData icon;
+    String label;
+    
+    if (state.cameraError.isNotEmpty) {
+      // Red for error
+      bg = AppColors.error500.withValues(alpha: 0.16);
+      fg = AppColors.error500;
+      icon = Icons.videocam_off;
+      label = 'Camera error';
+    } else if (state.cameraTurnedOff) {
+      // Orange for turned off
+      bg = AppColors.warning500.withValues(alpha: 0.16);
+      fg = AppColors.warning500;
+      icon = Icons.videocam_off;
+      label = 'Camera off';
+    } else if (state.cameraBusy) {
+      // Yellow for scanning
+      bg = AppColors.warning500.withValues(alpha: 0.16);
+      fg = AppColors.warning500;
+      icon = Icons.hourglass_top;
+      label = 'Scanning...';
+    } else if (state.cameraLive) {
+      // Green for live
+      bg = AppColors.success500.withValues(alpha: 0.16);
+      fg = AppColors.success500;
+      icon = Icons.videocam;
+      label = 'Camera live';
+    } else {
+      // Gray for offline
+      bg = AppColors.neutral100;
+      fg = AppColors.neutral600;
+      icon = Icons.videocam_off;
+      label = 'Camera offline';
+    }
 
     return Tooltip(
-      message: state.cameraStatus,
+      message: state.cameraError.isNotEmpty 
+          ? state.cameraError 
+          : state.cameraStatus,
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: c.captureCameraSearch,
+        onTap: c.openCameraModal,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: live ? AppColors.success500 : AppColors.neutral300,
+              color: state.cameraTurnedOff || state.cameraError.isNotEmpty
+                  ? fg
+                  : (state.cameraLive ? AppColors.success500 : AppColors.neutral300),
             ),
           ),
           child: Padding(
@@ -461,11 +487,7 @@ class _CameraStatusChip extends ConsumerWidget {
                 Icon(icon, size: 16, color: fg),
                 const SizedBox(width: AppSpacing.x6),
                 Text(
-                  state.cameraBusy
-                      ? 'Scanning...'
-                      : live
-                          ? 'Camera live'
-                          : 'Camera offline',
+                  label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: fg,
                     fontWeight: FontWeight.w600,

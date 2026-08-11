@@ -4,13 +4,42 @@ Flutter **Windows desktop** POS app (`pos-294`).
 
 ## Recent functionality updates
 
+- **Inventory automatic deduction** on bill save and update.
+  - When a bill is created, inventory is deducted for each line item based on qty/weight.
+  - When a bill is updated, old inventory is restored and new inventory is deducted (delta applied).
+  - Allows negative inventory (no over-selling validation).
+  - Updates `inv_current_qty` for unit items or `inv_current_weight` for weight items.
+- **Camera search keyboard shortcut** for seamless workflow.
+  - Press `/` to toggle camera live mode ON/OFF (if camera is enabled and Windows platform).
+  - Press `/` to focus search field if camera is turned off (fallback to text search).
+  - Click camera badge to open settings modal with live preview and toggle-off button.
+- **Camera control modal** with live feed preview.
+  - Shows live camera preview so users can see what the camera sees.
+  - Displays camera status (Live, Offline, Error, Turned Off) with color-coded badge.
+  - "Turn Camera Off/On" button for persistent camera preference toggle.
+  - Accessible via camera badge click from Sales Desk search area.
+- **Camera badge color states**.
+  - 🟢 Green: Camera live and connected.
+  - 🟠 Orange: Camera turned off (requires modal to re-enable).
+  - 🔴 Red: Camera error (shows error message in tooltip).
+  - 🟡 Yellow: Scanning/capturing frame.
+  - ⚫ Gray: Offline/unavailable.
+- **Windows image-based product search** in Sales Desk with live camera integration and barcode detection.
+  - Camera captures frames and extracts product data via barcode (priority) or ONNX image embedding similarity.
+  - Barcode match returns 100% similarity; embedding match returns cosine-similarity score.
+  - Search results display alongside typed-text results; click an image card to select that product.
+- **Automatic barcode extraction** from training images during embedding refresh.
+  - Scans master image for barcode codes (Code39, Code128, EAN, UPC, ITF, Codabar) using pure-Dart Yomu decoder.
+  - If barcode found and differs from product barcode, updates product automatically.
+- **Embedding refresh and cleanup controls** in Settings > Item Configuration.
+  - Click "Refresh embeddings" to rebuild the product embedding index from training images.
+  - Toggle "Clean up training images after embedding" to auto-delete variant images (_1 through _5) after indexing; master (_master) is always kept.
 - Sales Desk search dropdown is now **image-card only** in a **3-column keyboard-navigable grid**.
-- Sales Desk search shortcut is now **`/`**.
 - Sales Desk add flow: Enter adds selected item, focus moves to qty/wt, next Enter confirms and returns focus to search.
 - Search cards now show item image, Tamil/English names, price per qty/kg, stock tag, and brand.
 - Reports page and route were removed.
 - Items add/edit modal redesigned with image-first layout and grouped fields.
-- Item image handling supports JPG only, saved as `<SKU>_master.jpg` to configurable root path from Settings.
+- Item image handling supports JPG/JPEG/PNG, saved with training format (`<SKU>_master`, `<SKU>_1` through `<SKU>_5`) to configurable root path from Settings.
 - Item images in Sales Desk and Items page now resolve using Settings image root path.
 - Brand display with fallback is shown in Sales Desk search cards and Items cards.
 - Reusable UI blocks were refactored into `lib/shared/widgets` (common `AppCard` and `SectionCard`).
@@ -47,6 +76,7 @@ lib/
     bulk/                       Bulk import/export operations
     printing/                   Receipt preview + WebView printing
     settings/                   App configuration + preferences
+    image_search/               ONNX embedding indexing and camera search (Windows only)
 ```
 
 Each feature follows clean architecture:
@@ -60,9 +90,21 @@ Each feature follows clean architecture:
 
 ### Sales Desk / Billing
 
-- Keyboard-first cart entry and checkout flow
+- Keyboard-first cart entry and checkout flow with automatic inventory deduction
 - 3-column image search cards with keyboard navigation
-- `/` shortcut to focus search
+- `/` shortcut to toggle camera live mode or focus search
+- **Camera-based product search** (Windows only)
+  - Press `/` to activate camera live mode or toggle it off (persistent state)
+  - Click camera badge to open settings modal with live preview
+  - Camera status chip shows Live (green), Offline (gray), Error (red), or Turned Off (orange)
+  - Automatically tries barcode extraction first (priority match at 100% similarity)
+  - Falls back to ONNX image embedding similarity for products without barcodes
+  - Live camera feed preview in modal allows user to see what camera captures
+- **Automatic inventory deduction**
+  - Inventory is deducted when bill is successfully saved
+  - On bill update, old inventory is restored and new inventory is deducted
+  - Allows negative inventory (no over-selling validation)
+  - Updates `inv_current_qty` (for unit items) or `inv_current_weight` (for weight items)
 - Enter-driven item add and qty/wt confirmation focus flow
 - Recent bills and bill edit flow
 - Hold / recall bills
@@ -100,12 +142,119 @@ Each feature follows clean architecture:
   - Brand propagation from catalog
   - Wholesale auto-apply toggle
   - Item Images Root Path configuration
+  - **Refresh embeddings** button to rebuild product image embeddings from training images
+    - Scans all products for training image files (format: `<SKU>_master.<ext>`, `<SKU>_1.<ext>` through `<SKU>_5.<ext>`)
+    - Only indexes products with master + at least one variant image
+    - Computes 112x112 ONNX embeddings locally (Windows only)
+    - Auto-extracts barcode from master image using Yomu decoder; updates product barcode if found and different
+  - **Clean up training images after embedding** toggle
+    - Auto-deletes variant images (_1 through _5) after successful embedding refresh
+    - Master image (_master) is always retained for future searches
 - Toast-based success and error messages
 
 ### Authentication / Printing
 
 - Admin PIN/session protection
 - WebView-backed receipt preview and print flow
+
+## Image Search Architecture (Windows Only)
+
+### Overview
+
+The app includes a local, offline image-based product search system using ONNX neural network inference. This enables two search modes:
+
+1. **Barcode-based** (priority): Extracts product barcode from camera frame or training image using pure-Dart Yomu decoder, returns exact 100% match if barcode found
+2. **Embedding-based** (fallback): Computes cosine-similarity between query image embedding and indexed product embeddings, returns top match
+
+### Training Images
+
+Product images are organized in a configurable file root (set in Settings > Item Configuration):
+
+```
+<ImageRoot>/
+  <SKU>_master.jpg        Master image (required for indexing)
+  <SKU>_1.jpg             Variant 1 (optional, used for training)
+  <SKU>_2.jpg             Variant 2 (optional, used for training)
+  ...
+  <SKU>_5.jpg             Variant 5 (optional, used for training)
+```
+
+**Supported formats**: JPG, JPEG, PNG
+
+**Master image naming**: `<SKU>_master.<ext>` is the authoritative product image and barcode source. Master images are never deleted during cleanup.
+
+**Variant images**: `<SKU>_1.<ext>` through `<SKU>_5.<ext>` are alternate angles or lighting. Used only for embedding indexing. Can be auto-deleted by enabling "Clean up training images after embedding" in Settings.
+
+### Embedding Indexing
+
+When "Refresh embeddings" is clicked in Settings:
+
+1. **Scan**: Find all SKUs with master image + at least one variant
+2. **Process**: For each product image:
+   - Resize to 112×112 pixels
+   - Normalize by mean=127.5, scale=1/128
+   - Run ONNX model to get 512-dim embedding vector
+   - L2-normalize for cosine-similarity dot-product equivalence
+   - Store in `product_embeddings` table with product_id and image_url
+3. **Barcode extraction** (master image only):
+   - Decode barcode using Yomu (Code39, Code128, EAN, UPC, ITF, Codabar)
+   - If barcode found and differs from `products.barcode`, auto-update the field
+4. **Cleanup** (if enabled):
+   - Delete variant images (_1 through _5); always keep master
+
+### Camera Search (Sales Desk)
+
+**Workflow**:
+1. Press `/` to toggle camera live mode ON/OFF (or focus search if camera is turned off)
+2. When camera is live, it captures frames continuously:
+   - Sent to barcode decoder → if match found, return 100% similarity (exact match)
+   - Sent to embedding inference → compute cosine-similarity against indexed products
+   - Best match (barcode or embedding) is displayed in search results
+3. Click image card to select product and add to cart
+4. Click camera badge to open settings modal with live preview
+
+**Camera Control Modal**:
+- Shows live camera preview so user can see what the camera sees
+- Displays camera status with color-coded badge (Green/Orange/Red/Yellow/Gray)
+- "Turn Camera Off/On" button to disable/enable camera search (persistent toggle)
+- Works seamlessly with "/" key binding for on/off toggling
+
+**Camera Badge States**:
+- 🟢 **Live**: Camera connected and actively capturing
+- 🟡 **Scanning**: Currently processing a frame (busy state)
+- 🟠 **Off**: Camera turned off via modal (requires re-enabling)
+- 🔴 **Error**: Camera error occurred (shows error in tooltip)
+- ⚫ **Offline**: Camera unavailable or not connected
+
+**Platform support**: Camera is Windows-only. On other platforms, camera status shows "Camera is Windows-only".
+
+## Inventory Management
+
+### Automatic Deduction on Billing
+
+When a bill is successfully created or updated, inventory is automatically adjusted:
+
+**On Bill Creation**:
+- Each line item's quantity/weight is deducted from the corresponding product inventory
+- `inv_current_qty` is reduced for unit-priced items
+- `inv_current_weight` is reduced for weight-priced items
+
+**On Bill Update**:
+- Old bill inventory is restored (reversed)
+- New bill inventory is deducted
+- Delta is calculated and applied: `new_qty - old_qty`
+
+**Negative Inventory**:
+- Negative inventory is **allowed** (no over-selling validation)
+- Useful for backorders, consignment, or manual adjustments
+
+**Example**:
+```
+Initial stock: 100 units
+Bill created with 30 units → Inventory becomes 70
+Bill updated to 50 units → Old 30 restored (70 + 30 = 100), new 50 deducted (100 - 50 = 50)
+Final stock: 50 units
+```
 
 ## Configuration
 
