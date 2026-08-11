@@ -340,7 +340,9 @@ class ProductEmbeddingRepository {
     List<String> variants,
     Map<String, File> fileIndex,
   ) async {
+    final skuKey = sku.trim().toLowerCase();
     for (final variant in variants) {
+      final variantKey = variant.trim().toLowerCase();
       for (final extension in const ['jpg', 'jpeg', 'png']) {
         final fileName = ItemImagePath.trainingFileNameForSku(
           sku,
@@ -359,6 +361,22 @@ class ProductEmbeddingRepository {
         if (indexed != null) {
           _log('Matched indexed path (recursive/case-insensitive): "${indexed.path}"');
           return indexed;
+        }
+      }
+
+      // Fallback: case-insensitive pattern match from scanned index.
+      // Handles non-exact casing/formatting in the source filename.
+      final variantPattern = '${skuKey}_$variantKey.';
+      for (final entry in fileIndex.entries) {
+        final name = entry.key;
+        if (name.startsWith(variantPattern) &&
+            (name.endsWith('.jpg') ||
+                name.endsWith('.jpeg') ||
+                name.endsWith('.png'))) {
+          _log(
+            'Matched fallback pattern for sku="$sku" variant="$variant": "${entry.value.path}"',
+          );
+          return entry.value;
         }
       }
     }

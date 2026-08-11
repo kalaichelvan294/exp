@@ -13,18 +13,18 @@ class ItemImageLocation {
 class ItemImagePath {
   ItemImagePath._();
 
-  static String fileNameForSku(String sku) => '${sku.trim()}_MASTER.jpg';
+  static String fileNameForSku(String sku) => '${sku.trim().toUpperCase()}_MASTER.jpg';
 
   static String trainingFileNameForSku(
     String sku,
     String variant, {
     String extension = 'jpg',
   }) {
-    return '${sku.trim()}_${variant.trim()}.$extension';
+    return '${sku.trim().toUpperCase()}_${variant.trim().toUpperCase()}.${extension.trim().toLowerCase()}';
   }
 
   static Iterable<String> trainingFileNamesForSku(String sku) sync* {
-    const variants = ['master', '1', '2', '3', '4', '5'];
+    const variants = ['MASTER', '1', '2', '3', '4', '5'];
     const extensions = ['jpg', 'jpeg', 'png'];
     for (final variant in variants) {
       for (final extension in extensions) {
