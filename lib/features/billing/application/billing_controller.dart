@@ -1031,8 +1031,15 @@ class BillingController extends Notifier<BillingState> {
     if (id.isEmpty) return false;
     try {
       await _repo.deleteBill(id);
+      final recentWithoutDeleted = state.recentBills
+          .where((chip) => chip.billId != id)
+          .toList(growable: false);
       exitEdit();
-      state = state.copyWith(message: BillingMessage('Bill $id deleted.'));
+      state = state.copyWith(
+        recentBills: recentWithoutDeleted,
+        message: BillingMessage('Bill $id deleted.'),
+      );
+      await loadRecentBills();
       return true;
     } catch (e) {
       state = state.copyWith(
