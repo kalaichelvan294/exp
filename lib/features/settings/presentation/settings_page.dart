@@ -626,27 +626,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     : 'Refresh embeddings',
               ),
             ),
-            const SizedBox(width: AppSpacing.x8),
-            OutlinedButton.icon(
-              onPressed: _downloadingExceptionLog
-                  ? null
-                  : () async {
-                      setState(() => _downloadingExceptionLog = true);
-                      try {
-                        await _c.downloadExceptionLogFile();
-                      } finally {
-                        if (mounted) {
-                          setState(() => _downloadingExceptionLog = false);
-                        }
-                      }
-                    },
-              icon: const Icon(Icons.download, size: 16),
-              label: Text(
-                _downloadingExceptionLog
-                    ? 'Downloading...'
-                    : 'Download exception log',
-              ),
-            ),
           ],
         ),
         const SizedBox(height: AppSpacing.x20),
@@ -841,6 +820,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         Text(
           'Settings Page Help',
           style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: AppSpacing.x12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _downloadingExceptionLog
+                ? null
+                : () async {
+                    setState(() => _downloadingExceptionLog = true);
+                    try {
+                      await _c.downloadExceptionLogFile();
+                    } finally {
+                      if (mounted) {
+                        setState(() => _downloadingExceptionLog = false);
+                      }
+                    }
+                  },
+            icon: const Icon(Icons.download, size: 16),
+            label: Text(
+              _downloadingExceptionLog
+                  ? 'Downloading...'
+                  : 'Download exception log',
+            ),
+          ),
         ),
         const SizedBox(height: AppSpacing.x8),
         Text(
