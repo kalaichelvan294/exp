@@ -1,18 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/appearance.dart';
+import '../../../core/logging/exception_file_logger.dart';
 import '../../billing/domain/billing_enums.dart';
 import '../../image_search/data/product_embedding_repository.dart';
 import '../data/settings_repository.dart';
 import '../domain/app_settings.dart';
 import 'settings_state.dart';
-import 'package:flutter/foundation.dart';
 
 /// Settings controller. Ports settings.js: loads all settings, saves each
 /// section independently (with parity validation), and manages the editable
 /// category/brand lists and brand propagation.
 class SettingsController extends Notifier<SettingsState> {
   SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
+  bool _embeddingCancelRequested = false;
 
   @override
   SettingsState build() {
@@ -82,10 +83,7 @@ class SettingsController extends Notifier<SettingsState> {
     );
   }
 
-  void previewUpi({
-    required String upiId,
-    required String displayName,
-  }) {
+  void previewUpi({required String upiId, required String displayName}) {
     state = state.copyWith(
       settings: state.settings.copyWith(
         upiId: upiId,
@@ -97,9 +95,7 @@ class SettingsController extends Notifier<SettingsState> {
   void previewPaymentModes(List<PaymentMode> modes) {
     final normalized = modes.isEmpty
         ? <PaymentMode>[...state.settings.billingPaymentModes]
-        : AppSettings.normalizePaymentModes(
-            modes.map((m) => m.wire).toList(),
-          );
+        : AppSettings.normalizePaymentModes(modes.map((m) => m.wire).toList());
     state = state.copyWith(
       settings: state.settings.copyWith(billingPaymentModes: normalized),
     );
@@ -353,11 +349,29 @@ class SettingsController extends Notifier<SettingsState> {
   }
 
   Future<void> refreshImageEmbeddings() async {
+    if (state.embeddingRefreshRunning) return;
     final rootPath = state.settings.itemImagesRootPath.trim();
-    debugPrint('[EmbeddingRefresh] Triggered from settings. rootPath="$rootPath"');
     if (rootPath.isEmpty) {
-      return _err('Item images root path is required before refreshing embeddings.');
+      return _err(
+        'Item images root path is required before refreshing embeddings.',
+      );
     }
+
+    _embeddingCancelRequested = false;
+    state = state.copyWith(
+      embeddingRefreshRunning: true,
+      embeddingRefreshDialogVisible: true,
+      embeddingTotalProducts: 0,
+      embeddingProcessedProducts: 0,
+      embeddingProductsIndexed: 0,
+      embeddingImagesIndexed: 0,
+      embeddingProductsSkipped: 0,
+      embeddingBarcodeUpdates: 0,
+      embeddingCurrentSku: '',
+      embeddingCurrentStage: 'starting',
+      embeddingResult: '',
+      message: SettingsMessage.none,
+    );
 
     try {
       final result = await ref
@@ -365,19 +379,64 @@ class SettingsController extends Notifier<SettingsState> {
           .rebuildIndex(
             imagesRootPath: rootPath,
             cleanupTrainingImages: state.cleanupTrainingImagesAfterEmbedding,
+            onProgress: (progress) {
+              state = state.copyWith(
+                embeddingTotalProducts: progress.totalProducts,
+                embeddingProcessedProducts: progress.processedProducts,
+                embeddingProductsIndexed: progress.productsIndexed,
+                embeddingImagesIndexed: progress.imagesIndexed,
+                embeddingProductsSkipped: progress.productsSkipped,
+                embeddingBarcodeUpdates: progress.barcodeUpdates,
+                embeddingCurrentSku: progress.currentSku,
+                embeddingCurrentStage: progress.currentStage,
+              );
+            },
+            isCancelled: () => _embeddingCancelRequested,
           );
-      debugPrint(
-        '[EmbeddingRefresh] Completed. productsIndexed=${result.productsIndexed}, '
-        'imagesIndexed=${result.imagesIndexed}, productsSkipped=${result.productsSkipped}, '
-        'barcodeUpdates=${result.barcodeUpdates}',
+      final summary =
+          'Indexed ${result.productsIndexed} product(s), ${result.imagesIndexed} image(s), '
+          'skipped ${result.productsSkipped} product(s), barcode updates ${result.barcodeUpdates}.';
+      state = state.copyWith(
+        embeddingRefreshRunning: false,
+        embeddingProductsIndexed: result.productsIndexed,
+        embeddingImagesIndexed: result.imagesIndexed,
+        embeddingProductsSkipped: result.productsSkipped,
+        embeddingBarcodeUpdates: result.barcodeUpdates,
+        embeddingCurrentStage: result.cancelled ? 'cancelled' : 'completed',
+        embeddingResult: result.cancelled ? 'Cancelled. $summary' : summary,
       );
-      _ok(
-        'Indexed ${result.productsIndexed} product(s), ${result.imagesIndexed} image(s), '
-        'skipped ${result.productsSkipped} product(s), barcode updates ${result.barcodeUpdates}.',
-      );
+      if (result.cancelled) {
+        _err('Embedding refresh cancelled.');
+      } else {
+        _ok(summary);
+      }
     } catch (e) {
-      debugPrint('[EmbeddingRefresh] Failed: $e');
+      state = state.copyWith(
+        embeddingRefreshRunning: false,
+        embeddingCurrentStage: 'failed',
+        embeddingResult: 'Failed to refresh embeddings: ${e.toString()}',
+      );
       _err('Failed to refresh embeddings: ${e.toString()}');
+    }
+  }
+
+  void closeEmbeddingRefreshDialog() {
+    if (state.embeddingRefreshRunning) {
+      _embeddingCancelRequested = true;
+    }
+    state = state.copyWith(embeddingRefreshDialogVisible: false);
+  }
+
+  Future<void> downloadExceptionLogFile() async {
+    try {
+      final path = await ref.read(exceptionFileLoggerProvider).exportLogFile();
+      if (path == null) {
+        _err('No exception log file available to download.');
+        return;
+      }
+      _ok('Exception log downloaded to: $path');
+    } catch (e) {
+      _err('Failed to download exception log: ${e.toString()}');
     }
   }
 

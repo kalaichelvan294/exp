@@ -42,6 +42,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   _SettingsSection _activeSection = _SettingsSection.storeProfile;
   bool _adminTimeoutDirty = false;
   bool _synced = false;
+  bool _downloadingExceptionLog = false;
 
   @override
   void dispose() {
@@ -131,31 +132,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     return ModuleScaffold(
-      child: !state.loaded
-          ? const Center(child: CircularProgressIndicator())
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 240,
-                  child: _SettingsNav(
-                    active: _activeSection,
-                    onSelected: (section) => setState(() {
-                      _activeSection = section;
-                    }),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.x16),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [_activeSectionCard(state)],
+      child: Stack(
+        children: [
+          !state.loaded
+              ? const Center(child: CircularProgressIndicator())
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 240,
+                      child: _SettingsNav(
+                        active: _activeSection,
+                        onSelected: (section) => setState(() {
+                          _activeSection = section;
+                        }),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: AppSpacing.x16),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [_activeSectionCard(state)],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+          if (state.embeddingRefreshDialogVisible)
+            _embeddingRefreshOverlay(state),
+        ],
+      ),
     );
   }
 
@@ -582,7 +589,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ).textTheme.bodySmall?.copyWith(color: AppColors.neutral500),
         ),
         const SizedBox(height: AppSpacing.x20),
-        Text('Image Embeddings', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Image Embeddings',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: AppSpacing.x8),
         Row(
           children: [
@@ -606,9 +616,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(width: AppSpacing.x12),
             FilledButton.icon(
-              onPressed: _c.refreshImageEmbeddings,
+              onPressed: state.embeddingRefreshRunning
+                  ? null
+                  : _c.refreshImageEmbeddings,
               icon: const Icon(Icons.auto_awesome, size: 16),
-              label: const Text('Refresh embeddings'),
+              label: Text(
+                state.embeddingRefreshRunning
+                    ? 'Refreshing...'
+                    : 'Refresh embeddings',
+              ),
+            ),
+            const SizedBox(width: AppSpacing.x8),
+            OutlinedButton.icon(
+              onPressed: _downloadingExceptionLog
+                  ? null
+                  : () async {
+                      setState(() => _downloadingExceptionLog = true);
+                      try {
+                        await _c.downloadExceptionLogFile();
+                      } finally {
+                        if (mounted) {
+                          setState(() => _downloadingExceptionLog = false);
+                        }
+                      }
+                    },
+              icon: const Icon(Icons.download, size: 16),
+              label: Text(
+                _downloadingExceptionLog
+                    ? 'Downloading...'
+                    : 'Download exception log',
+              ),
             ),
           ],
         ),
@@ -708,6 +745,72 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           }),
         ),
       ],
+    );
+  }
+
+  Widget _embeddingRefreshOverlay(SettingsState state) {
+    final total = state.embeddingTotalProducts;
+    final processed = state.embeddingProcessedProducts;
+    final progress = total > 0 ? (processed / total).clamp(0.0, 1.0) : null;
+    final isRunning = state.embeddingRefreshRunning;
+    final stage = state.embeddingCurrentStage;
+    final sku = state.embeddingCurrentSku;
+
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black45,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: AppCard(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Embedding Refresh',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.x12),
+                  LinearProgressIndicator(value: progress),
+                  const SizedBox(height: AppSpacing.x12),
+                  Text(
+                    'Processed $processed of $total products',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  if (stage.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.x4),
+                    Text('Stage: $stage'),
+                  ],
+                  if (sku.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.x4),
+                    Text('SKU: $sku'),
+                  ],
+                  const SizedBox(height: AppSpacing.x8),
+                  Text(
+                    'Indexed products: ${state.embeddingProductsIndexed} | '
+                    'Images: ${state.embeddingImagesIndexed} | '
+                    'Skipped: ${state.embeddingProductsSkipped} | '
+                    'Barcode updates: ${state.embeddingBarcodeUpdates}',
+                  ),
+                  if (state.embeddingResult.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.x12),
+                    Text(state.embeddingResult),
+                  ],
+                  const SizedBox(height: AppSpacing.x16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: _c.closeEmbeddingRefreshDialog,
+                      child: Text(isRunning ? 'Cancel and Close' : 'Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

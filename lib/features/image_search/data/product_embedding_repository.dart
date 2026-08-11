@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:yomu/yomu.dart';
@@ -19,12 +19,36 @@ class EmbeddingRefreshSummary {
     required this.imagesIndexed,
     required this.barcodeUpdates,
     required this.productsSkipped,
+    this.cancelled = false,
   });
 
   final int productsIndexed;
   final int imagesIndexed;
   final int barcodeUpdates;
   final int productsSkipped;
+  final bool cancelled;
+}
+
+class EmbeddingRefreshProgress {
+  const EmbeddingRefreshProgress({
+    required this.totalProducts,
+    required this.processedProducts,
+    required this.productsIndexed,
+    required this.imagesIndexed,
+    required this.productsSkipped,
+    required this.barcodeUpdates,
+    required this.currentSku,
+    required this.currentStage,
+  });
+
+  final int totalProducts;
+  final int processedProducts;
+  final int productsIndexed;
+  final int imagesIndexed;
+  final int productsSkipped;
+  final int barcodeUpdates;
+  final String currentSku;
+  final String currentStage;
 }
 
 class ImageSearchMatch {
@@ -59,10 +83,6 @@ class ProductEmbeddingRepository {
 
   List<_StoredEmbedding>? _cache;
   Map<String, Product>? _productCache;
-
-  void _log(String message) {
-    debugPrint('[EmbeddingRefresh] $message');
-  }
 
   String _sqlString(String value) => "'${value.replaceAll("'", "''")}'";
 
@@ -130,52 +150,83 @@ class ProductEmbeddingRepository {
   Future<EmbeddingRefreshSummary> rebuildIndex({
     required String imagesRootPath,
     required bool cleanupTrainingImages,
+    void Function(EmbeddingRefreshProgress progress)? onProgress,
+    bool Function()? isCancelled,
   }) async {
-    _log('Starting rebuild. imagesRootPath="$imagesRootPath", cleanupTrainingImages=$cleanupTrainingImages');
     final storageRoot = ItemImagePath.resolveStorageDirectory(imagesRootPath);
     if (storageRoot == null || storageRoot.trim().isEmpty) {
-      _log('Resolved storage root is invalid/null from imagesRootPath="$imagesRootPath".');
       throw StateError('Item images root path must point to a local folder.');
     }
-    _log('Resolved storage root="$storageRoot".');
     final root = Directory(storageRoot);
     if (!await root.exists()) {
-      _log('Storage root folder does not exist: "$storageRoot".');
       throw StateError('Item images root folder does not exist.');
     }
-    _log('Storage root exists: "$storageRoot".');
     final fileIndex = await _buildFileIndex(root);
-    _log('Discovered ${fileIndex.length} file(s) under root (recursive scan).');
 
-    final products = await _db.query(
-      'SELECT * FROM products ORDER BY id',
-    );
-    _log('Loaded ${products.length} product(s) from database.');
+    final products = await _db.query('SELECT * FROM products ORDER BY id');
+    final totalProducts = products.length;
     var productsIndexed = 0;
     var imagesIndexed = 0;
     var barcodeUpdates = 0;
     var productsSkipped = 0;
+    var processedProducts = 0;
+
+    void emitProgress({required String sku, required String stage}) {
+      onProgress?.call(
+        EmbeddingRefreshProgress(
+          totalProducts: totalProducts,
+          processedProducts: processedProducts,
+          productsIndexed: productsIndexed,
+          imagesIndexed: imagesIndexed,
+          productsSkipped: productsSkipped,
+          barcodeUpdates: barcodeUpdates,
+          currentSku: sku,
+          currentStage: stage,
+        ),
+      );
+    }
 
     for (final row in products) {
+      if (isCancelled?.call() == true) {
+        _invalidateCache();
+        return EmbeddingRefreshSummary(
+          productsIndexed: productsIndexed,
+          imagesIndexed: imagesIndexed,
+          barcodeUpdates: barcodeUpdates,
+          productsSkipped: productsSkipped,
+          cancelled: true,
+        );
+      }
       final product = Product.fromJson(row);
+      emitProgress(sku: product.sku, stage: 'locating_images');
       try {
-        final files = await _collectTrainingImages(root, product.sku, fileIndex);
+        final files = await _collectTrainingImages(
+          root,
+          product.sku,
+          fileIndex,
+        );
         if (files == null) {
           productsSkipped++;
-          _log(
-            'SKIP sku="${product.sku}" id="${product.id}" reason=no_master_image_found '
-            'expectedAnyOf=${_expectedTrainingNames(product.sku, const ["master"]).join(",")}',
-          );
+          processedProducts++;
+          emitProgress(sku: product.sku, stage: 'skipped_no_master');
+          await Future<void>.delayed(Duration.zero);
           continue;
         }
-        _log(
-          'PROCESS sku="${product.sku}" id="${product.id}" files=${files.length} '
-          '(${files.map((f) => f.path.split(RegExp(r"[\\\\/]")).last).join(", ")})',
-        );
 
         final embeddings = <Map<String, Object?>>[];
         String? detectedBarcode;
         for (final file in files) {
+          if (isCancelled?.call() == true) {
+            _invalidateCache();
+            return EmbeddingRefreshSummary(
+              productsIndexed: productsIndexed,
+              imagesIndexed: imagesIndexed,
+              barcodeUpdates: barcodeUpdates,
+              productsSkipped: productsSkipped,
+              cancelled: true,
+            );
+          }
+          emitProgress(sku: product.sku, stage: 'embedding_file');
           final bytes = await file.readAsBytes();
           final vector = await _vision.embedImage(bytes);
           embeddings.add({
@@ -185,18 +236,18 @@ class ProductEmbeddingRepository {
             'embedding': vector,
           });
           detectedBarcode ??= _decodeBarcode(bytes);
-          _log(
-            'Embedded file="${file.path}" vectorSize=${vector.length} '
-            'barcodeDetected=${detectedBarcode != null && detectedBarcode.trim().isNotEmpty}',
-          );
+          await Future<void>.delayed(Duration.zero);
         }
 
         if (embeddings.isEmpty) {
           productsSkipped++;
-          _log('SKIP sku="${product.sku}" id="${product.id}" reason=no_embeddings_generated');
+          processedProducts++;
+          emitProgress(sku: product.sku, stage: 'skipped_no_embeddings');
+          await Future<void>.delayed(Duration.zero);
           continue;
         }
 
+        emitProgress(sku: product.sku, stage: 'saving_embeddings');
         final escapedId = product.id.replaceAll("'", "''");
         await _db.execute(
           "DELETE FROM product_embeddings WHERE product_id = '$escapedId'",
@@ -211,7 +262,6 @@ class ProductEmbeddingRepository {
 
         if (cleanupTrainingImages) {
           await _deleteTrainingVariants(root, product.sku);
-          _log('Cleanup enabled: deleted variant images for sku="${product.sku}".');
         }
 
         if (detectedBarcode != null &&
@@ -221,36 +271,34 @@ class ProductEmbeddingRepository {
             "UPDATE products SET barcode = ${_sqlString(detectedBarcode.trim())} WHERE id = ${_sqlString(product.id)}",
           );
           barcodeUpdates++;
-          _log(
-            'Barcode updated for sku="${product.sku}" id="${product.id}" '
-            'old="${product.barcode}" new="${detectedBarcode.trim()}".',
-          );
         }
 
         productsIndexed++;
         imagesIndexed += embeddings.length;
-      } catch (e, st) {
+        processedProducts++;
+        emitProgress(sku: product.sku, stage: 'done');
+      } catch (_) {
         productsSkipped++;
-        _log(
-          'ERROR sku="${product.sku}" id="${product.id}" error="$e"\n$st',
-        );
+        processedProducts++;
+        emitProgress(sku: product.sku, stage: 'error');
       }
+      await Future<void>.delayed(Duration.zero);
     }
 
     _invalidateCache();
-    _log(
-      'Rebuild complete. productsIndexed=$productsIndexed imagesIndexed=$imagesIndexed '
-      'productsSkipped=$productsSkipped barcodeUpdates=$barcodeUpdates',
-    );
     return EmbeddingRefreshSummary(
       productsIndexed: productsIndexed,
       imagesIndexed: imagesIndexed,
       barcodeUpdates: barcodeUpdates,
       productsSkipped: productsSkipped,
+      cancelled: false,
     );
   }
 
-  Future<ImageSearchMatch?> findBestMatchFromImageFile(File file, {int? inputSize}) async {
+  Future<ImageSearchMatch?> findBestMatchFromImageFile(
+    File file, {
+    int? inputSize,
+  }) async {
     final bytes = await file.readAsBytes();
     return findBestMatchFromImageBytes(bytes, inputSize: inputSize);
   }
@@ -264,7 +312,10 @@ class ProductEmbeddingRepository {
     List<int> bytes, {
     int? inputSize,
   }) async {
-    final queryVector = await _vision.embedImage(Uint8List.fromList(bytes), inputSize: inputSize);
+    final queryVector = await _vision.embedImage(
+      Uint8List.fromList(bytes),
+      inputSize: inputSize,
+    );
     final embeddings = await _loadEmbeddings();
     if (embeddings.isEmpty) return null;
 
@@ -288,7 +339,8 @@ class ProductEmbeddingRepository {
 
     for (final candidate in bestByProduct.values) {
       final currentBest = best;
-      if (currentBest == null || candidate.similarity > currentBest.similarity) {
+      if (currentBest == null ||
+          candidate.similarity > currentBest.similarity) {
         best = candidate;
       }
     }
@@ -300,33 +352,20 @@ class ProductEmbeddingRepository {
     String sku,
     Map<String, File> fileIndex,
   ) async {
-    _log('Path generation for sku="$sku" root="${root.path}"');
-    _log(
-      'Expected master names: ${_expectedTrainingNames(sku, const ['master']).join(', ')}',
-    );
-    final master = await _findExistingFile(
-      root,
-      sku,
-      const ['master'],
-      fileIndex,
-    );
+    final master = await _findExistingFile(root, sku, const [
+      'master',
+    ], fileIndex);
     if (master == null) {
-      _log('No master file resolved for sku="$sku".');
       return null;
     }
-    _log('Resolved master path for sku="$sku": "${master.path}"');
 
     final variants = <File>[master];
     for (final variant in const ['1', '2', '3', '4', '5']) {
-      final variantFile = await _findExistingFile(
-        root,
-        sku,
-        [variant],
-        fileIndex,
-      );
+      final variantFile = await _findExistingFile(root, sku, [
+        variant,
+      ], fileIndex);
       if (variantFile != null) {
         variants.add(variantFile);
-        _log('Resolved variant path for sku="$sku" variant="$variant": "${variantFile.path}"');
       }
     }
 
@@ -350,16 +389,11 @@ class ProductEmbeddingRepository {
           extension: extension,
         );
         final candidate = File(_joinPath(root.path, fileName));
-        _log(
-          'Trying candidate for sku="$sku" variant="$variant": "${candidate.path}"',
-        );
         if (await candidate.exists()) {
-          _log('Matched direct path: "${candidate.path}"');
           return candidate;
         }
         final indexed = fileIndex[fileName.toLowerCase()];
         if (indexed != null) {
-          _log('Matched indexed path (recursive/case-insensitive): "${indexed.path}"');
           return indexed;
         }
       }
@@ -373,30 +407,11 @@ class ProductEmbeddingRepository {
             (name.endsWith('.jpg') ||
                 name.endsWith('.jpeg') ||
                 name.endsWith('.png'))) {
-          _log(
-            'Matched fallback pattern for sku="$sku" variant="$variant": "${entry.value.path}"',
-          );
           return entry.value;
         }
       }
     }
     return null;
-  }
-
-  List<String> _expectedTrainingNames(String sku, List<String> variants) {
-    final names = <String>[];
-    for (final variant in variants) {
-      for (final extension in const ['jpg', 'jpeg', 'png']) {
-        names.add(
-          ItemImagePath.trainingFileNameForSku(
-            sku,
-            variant,
-            extension: extension,
-          ),
-        );
-      }
-    }
-    return names;
   }
 
   Future<Map<String, File>> _buildFileIndex(Directory root) async {
@@ -473,8 +488,7 @@ class ProductEmbeddingRepository {
   }
 }
 
-final productEmbeddingRepositoryProvider =
-    Provider<ProductEmbeddingRepository>(
+final productEmbeddingRepositoryProvider = Provider<ProductEmbeddingRepository>(
   (ref) => ProductEmbeddingRepository(
     ref.watch(dbConnectionProvider),
     VisionEmbeddingService.instance,
