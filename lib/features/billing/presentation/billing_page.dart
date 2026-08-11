@@ -87,6 +87,14 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         keys.contains(LogicalKeyboardKey.controlLeft) ||
         keys.contains(LogicalKeyboardKey.controlRight);
 
+    if (event.logicalKey == LogicalKeyboardKey.escape &&
+        state.searchDropdownOpen) {
+      _c.setSearchDropdownOpen(false);
+      _searchFocus.unfocus();
+      FocusScope.of(context).unfocus();
+      return KeyEventResult.handled;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.escape && state.previewVisible) {
       _c.hidePreview();
       return KeyEventResult.handled;
@@ -149,13 +157,16 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     // Show camera modal if needed
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (cameraModalVisible && !Navigator.of(context, rootNavigator: true).canPop()) {
+      if (cameraModalVisible &&
+          !Navigator.of(context, rootNavigator: true).canPop()) {
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => CameraControlModal(
             state: billingState,
-            cameraController: ref.read(billingControllerProvider.notifier).cameraController,
+            cameraController: ref
+                .read(billingControllerProvider.notifier)
+                .cameraController,
             onClose: () {
               Navigator.of(ctx).pop(); // Close dialog first
             },

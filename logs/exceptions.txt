@@ -1,0 +1,263 @@
+[2026-08-11T16:02:50.068250Z] [FATAL] [flutter]
+message: Zone mismatch.
+The Flutter bindings were initialized in a different zone than is now being used. This will likely cause confusion and bugs as any zone-specific configuration will inconsistently use the configuration of the original binding initialization zone or this zone based on hard-to-predict factors such as which zone was active when a particular callback was set.
+It is important to use the same zone when calling `ensureInitialized` on the binding as when calling `runApp` later.
+To make this warning fatal, set BindingBase.debugZoneErrorsAreFatal to true before the bindings are initialized (i.e. as the first statement in `void main() { }`).
+stacktrace:
+#0      BindingBase.debugCheckZone.<anonymous closure> (package:flutter/src/foundation/binding.dart:520:31)
+#1      BindingBase.debugCheckZone (package:flutter/src/foundation/binding.dart:526:6)
+#2      _runWidget (package:flutter/src/widgets/binding.dart:1949:18)
+#3      runApp (package:flutter/src/widgets/binding.dart:1885:3)
+#4      main.<anonymous closure> (package:pos_294_flutter/main.dart:43:7)
+#5      _rootRun (dart:async/zone_root.dart:35:13)
+#6      _CustomZone.run (dart:async/zone.dart:726:19)
+#7      _runZoned (dart:async/zone_api.dart:166:6)
+#8      runZonedGuarded (dart:async/zone_api.dart:152:12)
+#9      main (package:pos_294_flutter/main.dart:41:3)
+#10     _runMain.<anonymous closure> (dart:ui/hooks.dart:412:23)
+#11     _delayEntrypointInvocation.<anonymous closure> (dart:isolate-patch/isolate_patch.dart:313:19)
+#12     _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:192:12)
+---
+[2026-08-11T16:03:03.194473Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:03:10.502266Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:10.821340Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:10.960242Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:13.689124Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:14.768681Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:15.752950Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:16.814491Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:16.815487Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:16.991712Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:17.857917Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:18.806949Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:18.857955Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:19.783503Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:19.879732Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:20.798100Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:20.901356Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:21.890902Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:22.820876Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:23.843984Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:23.919839Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:24.820415Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:25.831525Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:26.790261Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:26.891213Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:29.084003Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:06:29.084003Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---
+[2026-08-11T16:28:16.796960Z] [FATAL] [flutter]
+message: Zone mismatch.
+The Flutter bindings were initialized in a different zone than is now being used. This will likely cause confusion and bugs as any zone-specific configuration will inconsistently use the configuration of the original binding initialization zone or this zone based on hard-to-predict factors such as which zone was active when a particular callback was set.
+It is important to use the same zone when calling `ensureInitialized` on the binding as when calling `runApp` later.
+To make this warning fatal, set BindingBase.debugZoneErrorsAreFatal to true before the bindings are initialized (i.e. as the first statement in `void main() { }`).
+stacktrace:
+#0      BindingBase.debugCheckZone.<anonymous closure> (package:flutter/src/foundation/binding.dart:520:31)
+#1      BindingBase.debugCheckZone (package:flutter/src/foundation/binding.dart:526:6)
+#2      _runWidget (package:flutter/src/widgets/binding.dart:1949:18)
+#3      runApp (package:flutter/src/widgets/binding.dart:1885:3)
+#4      main.<anonymous closure> (package:pos_294_flutter/main.dart:43:7)
+#5      _rootRun (dart:async/zone_root.dart:35:13)
+#6      _CustomZone.run (dart:async/zone.dart:726:19)
+#7      _runZoned (dart:async/zone_api.dart:166:6)
+#8      runZonedGuarded (dart:async/zone_api.dart:152:12)
+#9      main (package:pos_294_flutter/main.dart:41:3)
+#10     _runMain.<anonymous closure> (dart:ui/hooks.dart:412:23)
+#11     _delayEntrypointInvocation.<anonymous closure> (dart:isolate-patch/isolate_patch.dart:313:19)
+#12     _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:192:12)
+---
+[2026-08-11T16:43:36.304370Z] [FATAL] [flutter]
+message: A RenderFlex overflowed by 3.3 pixels on the right.
+---
+[2026-08-11T17:04:39.053375Z] [FATAL] [flutter]
+message: Zone mismatch.
+The Flutter bindings were initialized in a different zone than is now being used. This will likely cause confusion and bugs as any zone-specific configuration will inconsistently use the configuration of the original binding initialization zone or this zone based on hard-to-predict factors such as which zone was active when a particular callback was set.
+It is important to use the same zone when calling `ensureInitialized` on the binding as when calling `runApp` later.
+To make this warning fatal, set BindingBase.debugZoneErrorsAreFatal to true before the bindings are initialized (i.e. as the first statement in `void main() { }`).
+stacktrace:
+#0      BindingBase.debugCheckZone.<anonymous closure> (package:flutter/src/foundation/binding.dart:520:31)
+#1      BindingBase.debugCheckZone (package:flutter/src/foundation/binding.dart:526:6)
+#2      _runWidget (package:flutter/src/widgets/binding.dart:1949:18)
+#3      runApp (package:flutter/src/widgets/binding.dart:1885:3)
+#4      main.<anonymous closure> (package:pos_294_flutter/main.dart:43:7)
+#5      _rootRun (dart:async/zone_root.dart:35:13)
+#6      _CustomZone.run (dart:async/zone.dart:726:19)
+#7      _runZoned (dart:async/zone_api.dart:166:6)
+#8      runZonedGuarded (dart:async/zone_api.dart:152:12)
+#9      main (package:pos_294_flutter/main.dart:41:3)
+#10     _runMain.<anonymous closure> (dart:ui/hooks.dart:412:23)
+#11     _delayEntrypointInvocation.<anonymous closure> (dart:isolate-patch/isolate_patch.dart:313:19)
+#12     _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:192:12)
+---
+[2026-08-11T17:14:34.822230Z] [FATAL] [flutter]
+message: Zone mismatch.
+The Flutter bindings were initialized in a different zone than is now being used. This will likely cause confusion and bugs as any zone-specific configuration will inconsistently use the configuration of the original binding initialization zone or this zone based on hard-to-predict factors such as which zone was active when a particular callback was set.
+It is important to use the same zone when calling `ensureInitialized` on the binding as when calling `runApp` later.
+To make this warning fatal, set BindingBase.debugZoneErrorsAreFatal to true before the bindings are initialized (i.e. as the first statement in `void main() { }`).
+stacktrace:
+#0      BindingBase.debugCheckZone.<anonymous closure> (package:flutter/src/foundation/binding.dart:520:31)
+#1      BindingBase.debugCheckZone (package:flutter/src/foundation/binding.dart:526:6)
+#2      _runWidget (package:flutter/src/widgets/binding.dart:1949:18)
+#3      runApp (package:flutter/src/widgets/binding.dart:1885:3)
+#4      main.<anonymous closure> (package:pos_294_flutter/main.dart:43:7)
+#5      _rootRun (dart:async/zone_root.dart:35:13)
+#6      _CustomZone.run (dart:async/zone.dart:726:19)
+#7      _runZoned (dart:async/zone_api.dart:166:6)
+#8      runZonedGuarded (dart:async/zone_api.dart:152:12)
+#9      main (package:pos_294_flutter/main.dart:41:3)
+#10     _runMain.<anonymous closure> (dart:ui/hooks.dart:412:23)
+#11     _delayEntrypointInvocation.<anonymous closure> (dart:isolate-patch/isolate_patch.dart:313:19)
+#12     _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:192:12)
+---
+[2026-08-11T17:14:44.086268Z] [FATAL] [flutter]
+message: Zone mismatch.
+The Flutter bindings were initialized in a different zone than is now being used. This will likely cause confusion and bugs as any zone-specific configuration will inconsistently use the configuration of the original binding initialization zone or this zone based on hard-to-predict factors such as which zone was active when a particular callback was set.
+It is important to use the same zone when calling `ensureInitialized` on the binding as when calling `runApp` later.
+To make this warning fatal, set BindingBase.debugZoneErrorsAreFatal to true before the bindings are initialized (i.e. as the first statement in `void main() { }`).
+stacktrace:
+#0      BindingBase.debugCheckZone.<anonymous closure> (package:flutter/src/foundation/binding.dart:520:31)
+#1      BindingBase.debugCheckZone (package:flutter/src/foundation/binding.dart:526:6)
+#2      _runWidget (package:flutter/src/widgets/binding.dart:1949:18)
+#3      runApp (package:flutter/src/widgets/binding.dart:1885:3)
+#4      main.<anonymous closure> (package:pos_294_flutter/main.dart:43:7)
+#5      _rootRun (dart:async/zone_root.dart:35:13)
+#6      _CustomZone.run (dart:async/zone.dart:726:19)
+#7      _runZoned (dart:async/zone_api.dart:166:6)
+#8      runZonedGuarded (dart:async/zone_api.dart:152:12)
+#9      main (package:pos_294_flutter/main.dart:41:3)
+#10     _runMain.<anonymous closure> (dart:ui/hooks.dart:412:23)
+#11     _delayEntrypointInvocation.<anonymous closure> (dart:isolate-patch/isolate_patch.dart:313:19)
+#12     _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:192:12)
+---
+[2026-08-11T17:15:31.019646Z] [FATAL] [flutter]
+message: Zone mismatch.
+The Flutter bindings were initialized in a different zone than is now being used. This will likely cause confusion and bugs as any zone-specific configuration will inconsistently use the configuration of the original binding initialization zone or this zone based on hard-to-predict factors such as which zone was active when a particular callback was set.
+It is important to use the same zone when calling `ensureInitialized` on the binding as when calling `runApp` later.
+To make this warning fatal, set BindingBase.debugZoneErrorsAreFatal to true before the bindings are initialized (i.e. as the first statement in `void main() { }`).
+stacktrace:
+#0      BindingBase.debugCheckZone.<anonymous closure> (package:flutter/src/foundation/binding.dart:520:31)
+#1      BindingBase.debugCheckZone (package:flutter/src/foundation/binding.dart:526:6)
+#2      _runWidget (package:flutter/src/widgets/binding.dart:1949:18)
+#3      runApp (package:flutter/src/widgets/binding.dart:1885:3)
+#4      main.<anonymous closure> (package:pos_294_flutter/main.dart:43:7)
+#5      _rootRun (dart:async/zone_root.dart:35:13)
+#6      _CustomZone.run (dart:async/zone.dart:726:19)
+#7      _runZoned (dart:async/zone_api.dart:166:6)
+#8      runZonedGuarded (dart:async/zone_api.dart:152:12)
+#9      main (package:pos_294_flutter/main.dart:41:3)
+#10     _runMain.<anonymous closure> (dart:ui/hooks.dart:412:23)
+#11     _delayEntrypointInvocation.<anonymous closure> (dart:isolate-patch/isolate_patch.dart:313:19)
+#12     _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:192:12)
+---
+[2026-08-11T17:18:32.303543Z] [FATAL] [flutter]
+message: ListTile background color or ink splashes may be invisible.
+The ListTile is wrapped in a DecoratedBox that has a background color. Because ListTile paints its background and ink splashes on the nearest Material ancestor, this DecoratedBox will hide those effects.
+To fix this, wrap the ListTile in its own Material widget, or remove the background color from the intermediate DecoratedBox.
+---

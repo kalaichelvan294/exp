@@ -128,7 +128,9 @@ class BillingController extends Notifier<BillingState> {
       state = state.copyWith(
         cameraConnected: false,
         cameraBusy: false,
-        cameraStatus: state.cameraTurnedOff ? 'Camera turned off' : 'Camera is Windows-only',
+        cameraStatus: state.cameraTurnedOff
+            ? 'Camera turned off'
+            : 'Camera is Windows-only',
       );
       return;
     }
@@ -182,12 +184,13 @@ class BillingController extends Notifier<BillingState> {
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
-      
+
       // Initialize the new controller
       await controller.initialize();
-      
+
       // Only set if we haven't already initialized during this call
-      if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
         _cameraController = controller;
       } else {
         // We have a race condition - dispose the new one
@@ -281,12 +284,15 @@ class BillingController extends Notifier<BillingState> {
     if (state.cameraTurnedOff) {
       return;
     }
-    
-    state = state.copyWith(cameraBusy: true, cameraStatus: 'Initializing camera...');
+
+    state = state.copyWith(
+      cameraBusy: true,
+      cameraStatus: 'Initializing camera...',
+    );
     try {
       // Initialize camera for searching
       await _initCameraForMode(CameraCaptureMode.searching);
-      
+
       final controller = _cameraController;
       if (controller == null || !controller.value.isInitialized) {
         state = state.copyWith(
@@ -296,7 +302,10 @@ class BillingController extends Notifier<BillingState> {
         return;
       }
 
-      state = state.copyWith(cameraBusy: true, cameraStatus: 'Capturing frame...');
+      state = state.copyWith(
+        cameraBusy: true,
+        cameraStatus: 'Capturing frame...',
+      );
       final capture = await controller.takePicture();
       final embeddingRepo = ref.read(productEmbeddingRepositoryProvider);
       final barcode = await embeddingRepo.decodeBarcodeFromImageFile(
@@ -313,8 +322,14 @@ class BillingController extends Notifier<BillingState> {
               imageUrl: 'barcode:$normalizedBarcode',
             )
           : await embeddingRepo.findBestMatchFromImageFile(File(capture.path));
-      
-      if (match == null) {
+      final rankedMatches = barcodeMatch != null
+          ? <ImageSearchMatch>[match!]
+          : await embeddingRepo.findTopMatchesFromImageFile(
+              File(capture.path),
+              limit: 20,
+            );
+
+      if (rankedMatches.isEmpty) {
         state = state.copyWith(
           query: '',
           matches: const [],
@@ -327,22 +342,23 @@ class BillingController extends Notifier<BillingState> {
         );
         return;
       }
+      final topMatch = rankedMatches.first;
 
       state = state.copyWith(
         query: '',
-        matches: [match.product],
+        matches: rankedMatches.map((m) => m.product).toList(growable: false),
         selectedMatchIndex: 0,
         searchDropdownOpen: true,
         cameraBusy: false,
         cameraCaptureMode: CameraCaptureMode.none,
         cameraStatus: barcodeMatch != null
-            ? 'Barcode match: ${match.product.displayName}'
-            : 'Best match: ${match.product.displayName}',
+            ? 'Barcode match: ${topMatch.product.displayName}'
+            : 'Top match: ${topMatch.product.displayName}',
         message: BillingMessage(
           barcodeMatch != null
-              ? 'Barcode match: ${match.product.displayName}'
-              : 'Camera match: ${match.product.displayName} '
-                  '(${(match.similarity * 100).toStringAsFixed(1)}%)',
+              ? 'Barcode match: ${topMatch.product.displayName}'
+              : 'Camera matches: ${rankedMatches.length}. Top: ${topMatch.product.displayName} '
+                    '(${(topMatch.similarity * 100).toStringAsFixed(1)}%)',
         ),
       );
     } on CameraException catch (e) {
@@ -391,7 +407,9 @@ class BillingController extends Notifier<BillingState> {
   /// For low-end systems: reduces CPU/memory usage significantly
   Future<void> processCameraFrameOptimized() async {
     // Check preconditions for processing
-    if (state.cameraTurnedOff || state.cameraProcessing || !state.searchFieldFocused) {
+    if (state.cameraTurnedOff ||
+        state.cameraProcessing ||
+        !state.searchFieldFocused) {
       return;
     }
 
@@ -411,7 +429,9 @@ class BillingController extends Notifier<BillingState> {
     _cameraFrameProcessingDebounce?.cancel();
     _cameraFrameProcessingDebounce = Timer(_searchDebounce, () async {
       // Double-check conditions after debounce
-      if (state.cameraTurnedOff || state.cameraProcessing || !state.searchFieldFocused) {
+      if (state.cameraTurnedOff ||
+          state.cameraProcessing ||
+          !state.searchFieldFocused) {
         return;
       }
 
@@ -427,7 +447,7 @@ class BillingController extends Notifier<BillingState> {
 
         final capture = await controller.takePicture();
         final embeddingRepo = ref.read(productEmbeddingRepositoryProvider);
-        
+
         // Try barcode first (100% exact match)
         final barcode = await embeddingRepo.decodeBarcodeFromImageFile(
           File(capture.path),
@@ -447,19 +467,22 @@ class BillingController extends Notifier<BillingState> {
             cameraBusy: false,
             cameraProcessing: false,
             cameraStatus: 'Barcode match: ${barcodeMatch.displayName}',
-            message: BillingMessage('Barcode match: ${barcodeMatch.displayName}'),
+            message: BillingMessage(
+              'Barcode match: ${barcodeMatch.displayName}',
+            ),
           );
           return;
         }
 
         // Fallback to embedding-based search
-        final match = await embeddingRepo.findBestMatchFromImageFile(
+        final rankedMatches = await embeddingRepo.findTopMatchesFromImageFile(
           File(capture.path),
           // Use reduced resolution for low-end systems: 80x80 instead of 112x112
           inputSize: 80,
+          limit: 20,
         );
 
-        if (match == null) {
+        if (rankedMatches.isEmpty) {
           state = state.copyWith(
             cameraBusy: false,
             cameraProcessing: false,
@@ -467,18 +490,19 @@ class BillingController extends Notifier<BillingState> {
           );
           return;
         }
+        final topMatch = rankedMatches.first;
 
         state = state.copyWith(
           query: '',
-          matches: [match.product],
+          matches: rankedMatches.map((m) => m.product).toList(growable: false),
           selectedMatchIndex: 0,
           searchDropdownOpen: true,
           cameraBusy: false,
           cameraProcessing: false,
-          cameraStatus: 'Match: ${match.product.displayName}',
+          cameraStatus: 'Top match: ${topMatch.product.displayName}',
           message: BillingMessage(
-            'Camera match: ${match.product.displayName} '
-            '(${(match.similarity * 100).toStringAsFixed(1)}%)',
+            'Camera matches: ${rankedMatches.length}. Top: ${topMatch.product.displayName} '
+            '(${(topMatch.similarity * 100).toStringAsFixed(1)}%)',
           ),
         );
       } catch (e) {
@@ -507,7 +531,10 @@ class BillingController extends Notifier<BillingState> {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       await ensureCameraReady();
     }
-    state = state.copyWith(cameraModalVisible: true, cameraCaptureMode: CameraCaptureMode.preview);
+    state = state.copyWith(
+      cameraModalVisible: true,
+      cameraCaptureMode: CameraCaptureMode.preview,
+    );
   }
 
   /// Closes the camera control modal - keeps camera alive
@@ -524,7 +551,9 @@ class BillingController extends Notifier<BillingState> {
     final newState = !state.cameraTurnedOff;
     state = state.copyWith(
       cameraTurnedOff: newState,
-      cameraCaptureMode: newState ? CameraCaptureMode.none : CameraCaptureMode.preview,
+      cameraCaptureMode: newState
+          ? CameraCaptureMode.none
+          : CameraCaptureMode.preview,
       cameraStatus: newState ? 'Camera turned off' : 'Camera turned on',
     );
     if (newState) {
@@ -559,7 +588,7 @@ class BillingController extends Notifier<BillingState> {
   void moveSelectionGrid({
     required int rowDelta,
     required int columnDelta,
-    int columns = 3,
+    int columns = 4,
   }) {
     if (state.matches.isEmpty) return;
     final len = state.matches.length;

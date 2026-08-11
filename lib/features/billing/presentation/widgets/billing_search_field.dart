@@ -40,6 +40,9 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
   String _overlayFallbackHost = '';
   String _overlayImageRootPath = '';
   double _overlayWidth = 0;
+  double _overlayHeight = 360;
+  double _overlayDx = 0;
+  bool _overlayOpenUpward = false;
 
   @override
   void initState() {
@@ -70,7 +73,43 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
 
     final renderObject = _searchFieldKey.currentContext?.findRenderObject();
     if (renderObject is RenderBox) {
-      _overlayWidth = renderObject.size.width;
+      final screen = MediaQuery.sizeOf(context);
+      const edgePadding = AppSpacing.x12;
+      const minOverlayHeight = 160.0;
+      const maxOverlayHeight = 520.0;
+
+      final fieldTopLeft = renderObject.localToGlobal(Offset.zero);
+      final fieldTop = fieldTopLeft.dy;
+      final fieldLeft = fieldTopLeft.dx;
+      final fieldBottom = fieldTop + renderObject.size.height;
+
+      final maxAllowedWidth = (screen.width - (edgePadding * 2)).clamp(
+        280.0,
+        double.infinity,
+      );
+      final desiredWidth = renderObject.size.width;
+      final effectiveWidth = desiredWidth > maxAllowedWidth
+          ? maxAllowedWidth
+          : desiredWidth;
+      _overlayWidth = effectiveWidth;
+
+      final availableRight = screen.width - edgePadding - fieldLeft;
+      var dx = 0.0;
+      if (effectiveWidth > availableRight) {
+        dx = availableRight - effectiveWidth;
+      }
+      final shiftedLeft = fieldLeft + dx;
+      if (shiftedLeft < edgePadding) {
+        dx += edgePadding - shiftedLeft;
+      }
+      _overlayDx = dx;
+
+      final availableBelow = screen.height - edgePadding - fieldBottom;
+      final availableAbove = fieldTop - edgePadding;
+      _overlayOpenUpward =
+          availableBelow < minOverlayHeight && availableAbove > availableBelow;
+      final rawHeight = _overlayOpenUpward ? availableAbove : availableBelow;
+      _overlayHeight = rawHeight.clamp(minOverlayHeight, maxOverlayHeight);
     }
 
     final shouldShow = _overlayOpen && _overlayMatches.isNotEmpty;
@@ -89,9 +128,11 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
               child: CompositedTransformFollower(
                 link: _layerLink,
                 showWhenUnlinked: false,
-                offset: const Offset(
-                  0,
-                  AppSizing.controlHeight + AppSpacing.x4,
+                offset: Offset(
+                  _overlayDx,
+                  _overlayOpenUpward
+                      ? -(_overlayHeight + AppSpacing.x4)
+                      : AppSizing.controlHeight + AppSpacing.x4,
                 ),
                 child: Material(
                   color: Colors.transparent,
@@ -102,6 +143,7 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
                       selectedIndex: _overlaySelectedIndex,
                       fallbackHost: _overlayFallbackHost,
                       imageRootPath: _overlayImageRootPath,
+                      maxHeight: _overlayHeight,
                     ),
                   ),
                 ),
@@ -140,6 +182,9 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
         return KeyEventResult.handled;
       case LogicalKeyboardKey.escape:
         _c.setSearchDropdownOpen(false);
+        widget.focusNode.unfocus();
+        FocusScope.of(context).unfocus();
+        _removeOverlay();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.enter:
       case LogicalKeyboardKey.numpadEnter:
@@ -158,7 +203,7 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
     if (state.query.isEmpty && _controller.text.isNotEmpty) {
       _controller.clear();
     }
-    _overlayMatches = state.matches.take(10).toList();
+    _overlayMatches = state.matches.take(20).toList();
     _overlayOpen = state.searchDropdownOpen;
     _overlaySelectedIndex = state.selectedMatchIndex;
     _overlayFallbackHost = config.databaseHost;
@@ -213,99 +258,134 @@ class _ResultsGrid extends ConsumerWidget {
     required this.selectedIndex,
     required this.fallbackHost,
     required this.imageRootPath,
+    required this.maxHeight,
   });
 
   final List<Product> matches;
   final int selectedIndex;
   final String fallbackHost;
   final String imageRootPath;
+  final double maxHeight;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = ref.read(billingControllerProvider.notifier);
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final maxWidth = (screenWidth - (AppSpacing.x12 * 2)).clamp(320.0, 1400.0);
-    const imageSize = 72.0;
+    const imageSize = 104.0;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Container(
-        margin: const EdgeInsets.only(top: AppSpacing.x4),
-        constraints: const BoxConstraints(maxHeight: 520),
-        decoration: BoxDecoration(
-          color: AppColors.neutral0,
-          borderRadius: AppRadius.card,
-          border: Border.all(color: AppColors.neutral200),
-          boxShadow: AppShadows.card,
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.x4),
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: BoxDecoration(
+        color: AppColors.neutral0,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.neutral200),
+        boxShadow: AppShadows.card,
+      ),
+      child: GridView.builder(
+        padding: const EdgeInsets.all(AppSpacing.x12),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          mainAxisSpacing: AppSpacing.x12,
+          crossAxisSpacing: AppSpacing.x12,
+          mainAxisExtent: 250,
         ),
-        child: GridView.builder(
-          padding: const EdgeInsets.all(AppSpacing.x12),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: AppSpacing.x8,
-            crossAxisSpacing: AppSpacing.x8,
-            childAspectRatio: 0.82,
-          ),
-          itemCount: matches.length,
-          itemBuilder: (context, index) {
-            final product = matches[index];
-            final active = index == selectedIndex;
-            final image = ItemImagePath.resolve(
-              sku: product.sku,
-              configuredRootPath: imageRootPath,
-              fallbackHost: fallbackHost,
-            );
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: AppRadius.input,
-                onTap: () => c.addProduct(product, 'MANUAL_SEARCH'),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.neutral50 : AppColors.neutral0,
-                    borderRadius: AppRadius.input,
-                    border: Border.all(
-                      color: active
-                          ? AppColors.primary500
-                          : AppColors.neutral300,
-                      width: active ? 2 : 1,
-                    ),
+        itemCount: matches.length,
+        itemBuilder: (context, index) {
+          final product = matches[index];
+          final active = index == selectedIndex;
+          final image = ItemImagePath.resolve(
+            sku: product.sku,
+            configuredRootPath: imageRootPath,
+            fallbackHost: fallbackHost,
+          );
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: AppRadius.input,
+              onTap: () => c.addProduct(product, 'MANUAL_SEARCH'),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: active ? AppColors.neutral50 : AppColors.neutral0,
+                  borderRadius: AppRadius.input,
+                  border: Border.all(
+                    color: active ? AppColors.primary500 : AppColors.neutral300,
+                    width: active ? 2 : 1,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: AppSpacing.x8),
-                      SizedBox(
-                        width: imageSize,
-                        height: imageSize,
-                        child: ClipRRect(
-                          borderRadius: AppRadius.input,
-                          child: image.filePath != null
-                              ? Image.file(
-                                  File(image.filePath!),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: AppColors.neutral100,
-                                      alignment: Alignment.center,
-                                      child: const Text('No image'),
-                                    );
-                                  },
-                                )
-                              : Image.network(
-                                  image.networkUrl ?? '',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: AppColors.neutral100,
-                                      alignment: Alignment.center,
-                                      child: const Text('No image'),
-                                    );
-                                  },
+                  boxShadow: active ? AppShadows.card : null,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: imageSize,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                topRight: Radius.circular(8),
+                              ),
+                              child: image.filePath != null
+                                  ? Image.file(
+                                      File(image.filePath!),
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: AppColors.neutral100,
+                                              alignment: Alignment.center,
+                                              child: const Text('No image'),
+                                            );
+                                          },
+                                    )
+                                  : Image.network(
+                                      image.networkUrl ?? '',
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: AppColors.neutral100,
+                                              alignment: Alignment.center,
+                                              child: const Text('No image'),
+                                            );
+                                          },
+                                    ),
+                            ),
+                          ),
+                          Positioned(
+                            top: AppSpacing.x8,
+                            left: AppSpacing.x8,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: AppColors.neutral900.withValues(
+                                  alpha: 0.78,
                                 ),
-                        ),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.x8,
+                                  vertical: AppSpacing.x4,
+                                ),
+                                child: Text(
+                                  product.stockDisplay,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: AppColors.neutral0,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      Padding(
+                    ),
+                    Expanded(
+                      child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.x8),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,9 +396,9 @@ class _ResultsGrid extends ConsumerWidget {
                                   : (product.sku.trim().isNotEmpty
                                         ? product.sku
                                         : 'Unnamed item'),
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium
+                              style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: AppSpacing.x4),
@@ -328,7 +408,6 @@ class _ResultsGrid extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            const SizedBox(height: AppSpacing.x4),
                             Text(
                               'Brand: ${product.brandName.trim().isNotEmpty ? product.brandName : 'Unbranded'}',
                               maxLines: 1,
@@ -336,37 +415,29 @@ class _ResultsGrid extends ConsumerWidget {
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(color: AppColors.neutral600),
                             ),
-                            const SizedBox(height: AppSpacing.x4),
-                            Text(
-                              product.stockDisplay,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: AppColors.neutral700,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            const SizedBox(height: AppSpacing.x6),
-                            Text(
-                              '${Money.format(product.ratePaise)} / ${product.pricingType == PricingType.weight ? 'kg' : 'qty'}',
-                              textAlign: TextAlign.right,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.primary600,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                            const Spacer(),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '${Money.format(product.ratePaise)} / ${product.pricingType == PricingType.weight ? 'kg' : 'qty'}',
+                                textAlign: TextAlign.right,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: AppColors.primary600,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }

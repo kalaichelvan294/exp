@@ -14,14 +14,22 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: padding ?? const EdgeInsets.all(AppSpacing.x20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
         borderRadius: AppRadius.card,
-        border: Border.all(color: AppColors.neutral200),
         boxShadow: AppShadows.card,
       ),
-      child: child,
+      child: Material(
+        color: theme.colorScheme.surface,
+        borderRadius: AppRadius.card,
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(AppSpacing.x20),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.card,
+            border: Border.all(color: AppColors.neutral200),
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

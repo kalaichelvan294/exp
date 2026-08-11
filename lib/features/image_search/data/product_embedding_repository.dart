@@ -312,16 +312,41 @@ class ProductEmbeddingRepository {
     List<int> bytes, {
     int? inputSize,
   }) async {
+    final matches = await findTopMatchesFromImageBytes(
+      bytes,
+      inputSize: inputSize,
+      limit: 1,
+    );
+    if (matches.isEmpty) return null;
+    return matches.first;
+  }
+
+  Future<List<ImageSearchMatch>> findTopMatchesFromImageFile(
+    File file, {
+    int? inputSize,
+    int limit = 20,
+  }) async {
+    final bytes = await file.readAsBytes();
+    return findTopMatchesFromImageBytes(
+      bytes,
+      inputSize: inputSize,
+      limit: limit,
+    );
+  }
+
+  Future<List<ImageSearchMatch>> findTopMatchesFromImageBytes(
+    List<int> bytes, {
+    int? inputSize,
+    int limit = 20,
+  }) async {
     final queryVector = await _vision.embedImage(
       Uint8List.fromList(bytes),
       inputSize: inputSize,
     );
     final embeddings = await _loadEmbeddings();
-    if (embeddings.isEmpty) return null;
+    if (embeddings.isEmpty) return const [];
 
     final products = await _loadProducts();
-    ImageSearchMatch? best;
-
     final bestByProduct = <String, ImageSearchMatch>{};
     for (final embedding in embeddings) {
       final product = products[embedding.productId];
@@ -336,15 +361,11 @@ class ProductEmbeddingRepository {
         );
       }
     }
-
-    for (final candidate in bestByProduct.values) {
-      final currentBest = best;
-      if (currentBest == null ||
-          candidate.similarity > currentBest.similarity) {
-        best = candidate;
-      }
-    }
-    return best;
+    if (bestByProduct.isEmpty) return const [];
+    final ranked = bestByProduct.values.toList(growable: false)
+      ..sort((a, b) => b.similarity.compareTo(a.similarity));
+    final safeLimit = limit < 1 ? 1 : limit;
+    return ranked.take(safeLimit).toList(growable: false);
   }
 
   Future<List<File>?> _collectTrainingImages(
