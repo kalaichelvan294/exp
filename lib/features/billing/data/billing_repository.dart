@@ -134,7 +134,7 @@ class BillingRepository {
   Future<List<Product>> searchProducts(String query, {int limit = 8}) async {
     final escapedQuery = query.replaceAll("'", "''").toLowerCase();
     final rows = await _db.query(
-      "SELECT * FROM products WHERE LOWER(name) LIKE '%$escapedQuery%' OR LOWER(sku) LIKE '%$escapedQuery%' LIMIT $limit",
+      "SELECT * FROM products WHERE LOWER(name) LIKE '%$escapedQuery%' OR LOWER(sku) LIKE '%$escapedQuery%' OR LOWER(COALESCE(barcode, '')) LIKE '%$escapedQuery%' LIMIT $limit",
     );
     return rows.map(Product.fromJson).toList();
   }
@@ -142,7 +142,7 @@ class BillingRepository {
   Future<Product?> findExactProduct(String query) async {
     final escapedQuery = query.replaceAll("'", "''");
     final rows = await _db.query(
-      "SELECT * FROM products WHERE sku = '$escapedQuery' OR name = '$escapedQuery' LIMIT 1",
+      "SELECT * FROM products WHERE sku = '$escapedQuery' OR name = '$escapedQuery' OR barcode = '$escapedQuery' LIMIT 1",
     );
     return rows.isEmpty ? null : Product.fromJson(rows.first);
   }

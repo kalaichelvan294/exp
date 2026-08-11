@@ -31,6 +31,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
   late final TextEditingController _name;
   late final TextEditingController _nameTa;
   late final TextEditingController _sku;
+  late final TextEditingController _barcode;
   late final TextEditingController _retail;
   late final TextEditingController _wholesale;
   late final TextEditingController _wholesaleMinQty;
@@ -54,6 +55,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     _name = TextEditingController(text: item?.name ?? '');
     _nameTa = TextEditingController(text: item?.nameTa ?? '');
     _sku = TextEditingController(text: item?.sku ?? '');
+    _barcode = TextEditingController(text: item?.barcode ?? '');
     _retail = TextEditingController(
       text: item != null ? Money.toRupees(item.retailPricePaise) : '',
     );
@@ -84,6 +86,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     _name.dispose();
     _nameTa.dispose();
     _sku.dispose();
+    _barcode.dispose();
     _retail.dispose();
     _wholesale.dispose();
     _wholesaleMinQty.dispose();
@@ -99,6 +102,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     category: _category,
     brandName: _brand,
     sku: _sku.text,
+    barcode: _barcode.text,
     pricingType: _pricingType,
     retailPriceInput: _retail.text,
     wholesalePriceInput: _wholesale.text,
@@ -363,6 +367,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
           _field('Name', _name, onChanged: (_) => setState(() {})),
           _field('Tamil Name (optional)', _nameTa),
           _skuField(state),
+          _field('Barcode (optional)', _barcode),
           _dropdown<String>(
             label: 'Category',
             value: _categoryOptions.contains(_category)

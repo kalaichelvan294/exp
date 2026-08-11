@@ -10,6 +10,7 @@ class Item {
     this.nameTa = '',
     this.category = 'OTHER',
     required this.sku,
+    this.barcode = '',
     required this.pricingType,
     this.brandName = '',
     required this.retailPricePaise,
@@ -26,6 +27,7 @@ class Item {
   final String nameTa;
   final String category;
   final String sku;
+  final String barcode;
   final PricingType pricingType;
   final String brandName;
   final int retailPricePaise;
@@ -84,6 +86,7 @@ class Item {
       nameTa: (json['nameTa'] ?? json['name_ta'] ?? '').toString(),
       category: (json['category'] ?? 'OTHER').toString(),
       sku: (json['sku'] ?? '').toString(),
+      barcode: (json['barcode'] ?? '').toString(),
       pricingType: PricingType.fromWire(pricingWire),
       brandName: brand.toString(),
       retailPricePaise: retail,

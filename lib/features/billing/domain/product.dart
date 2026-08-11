@@ -8,6 +8,7 @@ class Product {
   const Product({
     required this.id,
     required this.sku,
+    this.barcode = '',
     required this.name,
     this.nameTa = '',
     this.brandName = '',
@@ -23,6 +24,7 @@ class Product {
 
   final String id;
   final String sku;
+  final String barcode;
   final String name;
   final String nameTa;
   final String brandName;
@@ -72,24 +74,28 @@ class Product {
     );
     final pricingWire = json['pricingType'] ?? json['pricing_type'] ?? 'unit';
     final brand = json['brandName'] ?? json['brand_name'] ?? '';
-    final wholesalePaise = json['wholesalePricePaise'] ??
+    final wholesalePaise =
+        json['wholesalePricePaise'] ??
         json['wholesale_price_paise'] ??
         json['wholesalePrice'];
-    final wholesaleMinQtyValue = json['wholesaleMinQty'] ??
+    final wholesaleMinQtyValue =
+        json['wholesaleMinQty'] ??
         json['wholesale_min_qty'] ??
         json['wholesaleMin'];
 
     return Product(
       id: (json['id'] ?? '').toString(),
       sku: (json['sku'] ?? json['id'] ?? '').toString(),
+      barcode: (json['barcode'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       nameTa: (json['nameTa'] ?? '').toString(),
       brandName: brand.toString(),
       category: (json['category'] ?? 'UNCATEGORIZED').toString(),
       pricingType: PricingType.fromWire(pricingWire),
       retailPricePaise: retail,
-      wholesalePricePaise:
-          wholesalePaise == null ? null : asInt(wholesalePaise),
+      wholesalePricePaise: wholesalePaise == null
+          ? null
+          : asInt(wholesalePaise),
       wholesaleMinQty: asNumOrNull(wholesaleMinQtyValue),
       invCurrentQty: asNum(json['inv_current_qty']),
       invCurrentWeight: asNum(json['inv_current_weight']),

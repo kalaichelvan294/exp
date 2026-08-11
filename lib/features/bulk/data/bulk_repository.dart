@@ -25,6 +25,7 @@ class BulkRepository {
       [
         'slno',
         'sku',
+        'barcode',
         'item_name',
         'brand_name',
         'item_tamil_name',
@@ -37,6 +38,7 @@ class BulkRepository {
       [
         '1',
         'BALA-CHIP-POTA-500G',
+        '8901234567890',
         'Potato chips(500g)',
         'BALAJI CHIPS',
         'உருளைக்கிழங்கு சிப்ஸ் (500கி)',
@@ -56,7 +58,7 @@ class BulkRepository {
 
   Future<BulkFile> downloadAllItems() async {
     final rows = await _db.query(
-      'SELECT id, sku, name, name_ta, category, brand_name, pricing_type, '
+      'SELECT id, sku, barcode, name, name_ta, category, brand_name, pricing_type, '
       'wholesale_min_qty, wholesale_price_paise, retail_price_paise '
       'FROM products ORDER BY id',
     );
@@ -64,6 +66,7 @@ class BulkRepository {
       [
         'slno',
         'sku',
+        'barcode',
         'item_name',
         'brand_name',
         'item_tamil_name',
@@ -95,11 +98,13 @@ class BulkRepository {
       filters.add("brand_name IN ($brands)");
     }
     if (categories.isNotEmpty) {
-      final cats = categories.map((c) => "'${c.replaceAll("'", "''")}'").join(',');
+      final cats = categories
+          .map((c) => "'${c.replaceAll("'", "''")}'")
+          .join(',');
       filters.add("category IN ($cats)");
     }
     final rows = await _db.query(
-      'SELECT id, sku, name, name_ta, category, brand_name, pricing_type, '
+      'SELECT id, sku, barcode, name, name_ta, category, brand_name, pricing_type, '
       'wholesale_min_qty, wholesale_price_paise, retail_price_paise '
       'FROM products WHERE ${filters.join(' AND ')} ORDER BY id',
     );
@@ -107,6 +112,7 @@ class BulkRepository {
       [
         'slno',
         'sku',
+        'barcode',
         'item_name',
         'brand_name',
         'item_tamil_name',
@@ -200,9 +206,13 @@ class BulkRepository {
       rows: rows,
       summary: BulkPreviewSummary(
         readyCount: rows.where((r) => r.status != BulkRowStatus.error).length,
-        warningCount: rows.where((r) => r.status == BulkRowStatus.warning).length,
+        warningCount: rows
+            .where((r) => r.status == BulkRowStatus.warning)
+            .length,
         errorCount: rows.where((r) => r.status == BulkRowStatus.error).length,
-        skippedCount: rows.where((r) => r.status == BulkRowStatus.skipped).length,
+        skippedCount: rows
+            .where((r) => r.status == BulkRowStatus.skipped)
+            .length,
       ),
       autoDetectMode: true,
     );
@@ -238,9 +248,13 @@ class BulkRepository {
       rows: rows,
       summary: BulkPreviewSummary(
         readyCount: rows.where((r) => r.status != BulkRowStatus.error).length,
-        warningCount: rows.where((r) => r.status == BulkRowStatus.warning).length,
+        warningCount: rows
+            .where((r) => r.status == BulkRowStatus.warning)
+            .length,
         errorCount: rows.where((r) => r.status == BulkRowStatus.error).length,
-        skippedCount: rows.where((r) => r.status == BulkRowStatus.skipped).length,
+        skippedCount: rows
+            .where((r) => r.status == BulkRowStatus.skipped)
+            .length,
       ),
       autoDetectMode: false,
     );
@@ -266,10 +280,12 @@ class BulkRepository {
         }
         if (row.status == BulkRowStatus.error) {
           failed += 1;
-          changes.add(row.toApplyChange(
-            outcome: 'failed',
-            message: row.messages.join('; '),
-          ));
+          changes.add(
+            row.toApplyChange(
+              outcome: 'failed',
+              message: row.messages.join('; '),
+            ),
+          );
           continue;
         }
 
@@ -277,20 +293,24 @@ class BulkRepository {
         if (existing == null) {
           final itemId = await _insertItem(row);
           inserted += 1;
-          changes.add(row.toApplyChange(
-            outcome: 'applied',
-            operation: 'CREATE',
-            itemId: itemId,
-          ));
+          changes.add(
+            row.toApplyChange(
+              outcome: 'applied',
+              operation: 'CREATE',
+              itemId: itemId,
+            ),
+          );
         } else {
           await _updateItem(existing['id'].toString(), row);
           updated += 1;
-          changes.add(row.toApplyChange(
-            outcome: 'applied',
-            operation: 'UPDATE',
-            itemId: existing['id'].toString(),
-            before: existing,
-          ));
+          changes.add(
+            row.toApplyChange(
+              outcome: 'applied',
+              operation: 'UPDATE',
+              itemId: existing['id'].toString(),
+              before: existing,
+            ),
+          );
         }
       }
 
@@ -349,32 +369,38 @@ class BulkRepository {
         }
         if (row.status == BulkRowStatus.error) {
           failed += 1;
-          changes.add(row.toApplyChange(
-            outcome: 'failed',
-            message: row.messages.join('; '),
-          ));
+          changes.add(
+            row.toApplyChange(
+              outcome: 'failed',
+              message: row.messages.join('; '),
+            ),
+          );
           continue;
         }
 
         final existing = await _findItemBySku(row.sku);
         if (existing == null) {
           failed += 1;
-          changes.add(row.toApplyChange(
-            outcome: 'failed',
-            message: 'SKU not found in catalog.',
-          ));
+          changes.add(
+            row.toApplyChange(
+              outcome: 'failed',
+              message: 'SKU not found in catalog.',
+            ),
+          );
           continue;
         }
 
         final result = await _applyInventoryChange(existing, row);
         updated += 1;
-        changes.add(row.toApplyChange(
-          outcome: 'applied',
-          itemId: existing['id'].toString(),
-          before: result['before'],
-          after: result['after'],
-          trackType: result['trackType'],
-        ));
+        changes.add(
+          row.toApplyChange(
+            outcome: 'applied',
+            itemId: existing['id'].toString(),
+            before: result['before'],
+            after: result['after'],
+            trackType: result['trackType'],
+          ),
+        );
       }
 
       await _insertBatch(
@@ -436,7 +462,9 @@ class BulkRepository {
     }
 
     final batch = rows.first;
-    final operationType = BulkOperationType.fromWire(batch['operation_type'] as String?);
+    final operationType = BulkOperationType.fromWire(
+      batch['operation_type'] as String?,
+    );
     final items = _asList(batch['items_json']);
     final skippedRows = <BulkRevertSkip>[];
     var revertedCount = 0;
@@ -455,10 +483,12 @@ class BulkRepository {
           final operation = _str(change['operation']);
           final before = _asMap(change['before']);
           if (itemId.isEmpty) {
-            skippedRows.add(BulkRevertSkip(
-              sku: _str(change['sku']),
-              reason: 'Missing item id.',
-            ));
+            skippedRows.add(
+              BulkRevertSkip(
+                sku: _str(change['sku']),
+                reason: 'Missing item id.',
+              ),
+            );
             continue;
           }
           if (operation == 'CREATE') {
@@ -468,10 +498,12 @@ class BulkRepository {
           } else if (operation == 'UPDATE') {
             await _restoreItem(itemId, before);
           } else {
-            skippedRows.add(BulkRevertSkip(
-              sku: _str(change['sku']),
-              reason: 'Unknown item operation.',
-            ));
+            skippedRows.add(
+              BulkRevertSkip(
+                sku: _str(change['sku']),
+                reason: 'Unknown item operation.',
+              ),
+            );
             continue;
           }
           revertedCount += 1;
@@ -479,10 +511,12 @@ class BulkRepository {
           final itemId = _str(change['itemId']);
           final before = _asMap(change['before']);
           if (itemId.isEmpty) {
-            skippedRows.add(BulkRevertSkip(
-              sku: _str(change['sku']),
-              reason: 'Missing item id.',
-            ));
+            skippedRows.add(
+              BulkRevertSkip(
+                sku: _str(change['sku']),
+                reason: 'Missing item id.',
+              ),
+            );
             continue;
           }
           await _restoreInventory(itemId, before);
@@ -494,7 +528,10 @@ class BulkRepository {
         "UPDATE bulk_batches SET reverted = 1, reverted_at = CURRENT_TIMESTAMP WHERE batch_id = '$escapedBatchId'",
       );
       await _db.commit();
-      return BulkRevertResult(revertedCount: revertedCount, skippedRows: skippedRows);
+      return BulkRevertResult(
+        revertedCount: revertedCount,
+        skippedRows: skippedRows,
+      );
     } catch (e) {
       await _db.rollback();
       rethrow;
@@ -534,18 +571,25 @@ class BulkRepository {
   }
 
   Future<String> _insertItem(_ParsedItemRow row) async {
-    final itemId = 'item_${DateTime.now().microsecondsSinceEpoch}_${row.rowNumber}';
+    final itemId =
+        'item_${DateTime.now().microsecondsSinceEpoch}_${row.rowNumber}';
     final sku = row.sku.replaceAll("'", "''");
+    final barcode = row.barcode.replaceAll("'", "''");
+    final barcodeSql = barcode.isEmpty ? 'NULL' : "'$barcode'";
     final name = row.itemName.replaceAll("'", "''");
     final tamil = row.tamilName.replaceAll("'", "''");
     final category = row.category.replaceAll("'", "''");
     final brand = row.brandName.replaceAll("'", "''");
     final pricingType = row.pricingType.wire.toLowerCase();
-    final wholesalePrice = row.wholesalePricePaise == null ? 'NULL' : row.wholesalePricePaise.toString();
-    final wholesaleMinQty = row.wholesaleMinQty == null ? 'NULL' : row.wholesaleMinQty.toString();
+    final wholesalePrice = row.wholesalePricePaise == null
+        ? 'NULL'
+        : row.wholesalePricePaise.toString();
+    final wholesaleMinQty = row.wholesaleMinQty == null
+        ? 'NULL'
+        : row.wholesaleMinQty.toString();
     await _db.execute(
-      "INSERT INTO products (id, name, name_ta, category, sku, pricing_type, brand_name, retail_price_paise, wholesale_price_paise, wholesale_min_qty, rate) "
-      "VALUES ('$itemId', '$name', '$tamil', '$category', '$sku', '$pricingType', '$brand', ${row.retailPricePaise}, $wholesalePrice, $wholesaleMinQty, ${row.retailPricePaise})",
+      "INSERT INTO products (id, name, name_ta, category, sku, barcode, pricing_type, brand_name, retail_price_paise, wholesale_price_paise, wholesale_min_qty, rate) "
+      "VALUES ('$itemId', '$name', '$tamil', '$category', '$sku', $barcodeSql, '$pricingType', '$brand', ${row.retailPricePaise}, $wholesalePrice, $wholesaleMinQty, ${row.retailPricePaise})",
     );
     return itemId;
   }
@@ -553,15 +597,21 @@ class BulkRepository {
   Future<void> _updateItem(String itemId, _ParsedItemRow row) async {
     final escapedItemId = itemId.replaceAll("'", "''");
     final sku = row.sku.replaceAll("'", "''");
+    final barcode = row.barcode.replaceAll("'", "''");
+    final barcodeSql = barcode.isEmpty ? 'NULL' : "'$barcode'";
     final name = row.itemName.replaceAll("'", "''");
     final tamil = row.tamilName.replaceAll("'", "''");
     final category = row.category.replaceAll("'", "''");
     final brand = row.brandName.replaceAll("'", "''");
     final pricingType = row.pricingType.wire.toLowerCase();
-    final wholesalePrice = row.wholesalePricePaise == null ? 'NULL' : row.wholesalePricePaise.toString();
-    final wholesaleMinQty = row.wholesaleMinQty == null ? 'NULL' : row.wholesaleMinQty.toString();
+    final wholesalePrice = row.wholesalePricePaise == null
+        ? 'NULL'
+        : row.wholesalePricePaise.toString();
+    final wholesaleMinQty = row.wholesaleMinQty == null
+        ? 'NULL'
+        : row.wholesaleMinQty.toString();
     await _db.execute(
-      "UPDATE products SET name = '$name', name_ta = '$tamil', category = '$category', sku = '$sku', pricing_type = '$pricingType', brand_name = '$brand', retail_price_paise = ${row.retailPricePaise}, wholesale_price_paise = $wholesalePrice, wholesale_min_qty = $wholesaleMinQty, rate = ${row.retailPricePaise} WHERE id = '$escapedItemId'",
+      "UPDATE products SET name = '$name', name_ta = '$tamil', category = '$category', sku = '$sku', barcode = $barcodeSql, pricing_type = '$pricingType', brand_name = '$brand', retail_price_paise = ${row.retailPricePaise}, wholesale_price_paise = $wholesalePrice, wholesale_min_qty = $wholesaleMinQty, rate = ${row.retailPricePaise} WHERE id = '$escapedItemId'",
     );
   }
 
@@ -576,11 +626,13 @@ class BulkRepository {
     final sku = _str(before['sku']).replaceAll("'", "''");
     final pricingType = _str(before['pricing_type']).replaceAll("'", "''");
     final brand = _str(before['brand_name']).replaceAll("'", "''");
+    final barcode = _str(before['barcode']).replaceAll("'", "''");
+    final barcodeSql = barcode.isEmpty ? 'NULL' : "'$barcode'";
     final retail = _num(before['retail_price_paise']) ?? 0;
     final wholesale = _sqlNumberOrNull(before['wholesale_price_paise']);
     final wholesaleMinQty = _sqlNumberOrNull(before['wholesale_min_qty']);
     await _db.execute(
-      "UPDATE products SET name = '$name', name_ta = '$tamil', category = '$category', sku = '$sku', pricing_type = '$pricingType', brand_name = '$brand', retail_price_paise = $retail, wholesale_price_paise = $wholesale, wholesale_min_qty = $wholesaleMinQty, rate = $retail WHERE id = '$escapedItemId'",
+      "UPDATE products SET name = '$name', name_ta = '$tamil', category = '$category', sku = '$sku', barcode = $barcodeSql, pricing_type = '$pricingType', brand_name = '$brand', retail_price_paise = $retail, wholesale_price_paise = $wholesale, wholesale_min_qty = $wholesaleMinQty, rate = $retail WHERE id = '$escapedItemId'",
     );
   }
 
@@ -617,7 +669,9 @@ class BulkRepository {
         newQty = next < 0 ? 0 : next;
       }
     }
-    final delta = trackType == PricingType.weight ? newWeight - prevWeight : newQty - prevQty;
+    final delta = trackType == PricingType.weight
+        ? newWeight - prevWeight
+        : newQty - prevQty;
 
     await _db.execute(
       "UPDATE products SET inv_current_qty = $newQty, inv_current_weight = $newWeight WHERE id = '${itemId.replaceAll("'", "''")}'",
@@ -707,39 +761,39 @@ class BulkRepository {
     List<String> row,
   ) {
     final slno = _cell(headers, row, ['slno', 'sl_no', 'serial_no', 'sno']);
-    final sku = _normalizeSku(
-      _cell(headers, row, ['sku']),
-    );
+    final sku = _normalizeSku(_cell(headers, row, ['sku']));
+    final barcode = _cell(headers, row, ['barcode', 'bar_code']);
     final itemName = _cell(headers, row, ['item_name', 'name', 'product_name']);
     final brandName = _normalizeBrand(
       _cell(headers, row, ['brand_name', 'brand']),
     );
-    final tamilName = _cell(
-      headers,
-      row,
-      ['item_tamil_name', 'name_ta', 'tamil_name'],
-    );
-    final category = _normalizeCategory(
-      _cell(headers, row, ['category']),
-    );
-    final pricingLabel = _cell(
-      headers,
-      row,
-      ['weight_or_qty', 'pricing_type', 'track_type'],
-    );
+    final tamilName = _cell(headers, row, [
+      'item_tamil_name',
+      'name_ta',
+      'tamil_name',
+    ]);
+    final category = _normalizeCategory(_cell(headers, row, ['category']));
+    final pricingLabel = _cell(headers, row, [
+      'weight_or_qty',
+      'pricing_type',
+      'track_type',
+    ]);
     final pricingType = _pricingTypeFromLabel(pricingLabel);
-    final wholesaleMinQtyRaw =
-        _cell(headers, row, ['wholesale_min_qty', 'wholesale_min', 'min_qty']);
-    final wholesalePriceRaw = _cell(
-      headers,
-      row,
-      ['wholesale_price', 'wholesale_price_paise', 'wholesale_rate'],
-    );
-    final retailPriceRaw = _cell(
-      headers,
-      row,
-      ['retail_price', 'retail_price_paise', 'retail_rate'],
-    );
+    final wholesaleMinQtyRaw = _cell(headers, row, [
+      'wholesale_min_qty',
+      'wholesale_min',
+      'min_qty',
+    ]);
+    final wholesalePriceRaw = _cell(headers, row, [
+      'wholesale_price',
+      'wholesale_price_paise',
+      'wholesale_rate',
+    ]);
+    final retailPriceRaw = _cell(headers, row, [
+      'retail_price',
+      'retail_price_paise',
+      'retail_rate',
+    ]);
 
     final messages = <String>[];
     BulkRowStatus status = BulkRowStatus.ok;
@@ -754,7 +808,8 @@ class BulkRepository {
       status = BulkRowStatus.error;
       messages.add('Item name is required.');
     }
-    if (retailPriceRaw.trim().isEmpty || Money.parseInrToPaise(retailPriceRaw) <= 0) {
+    if (retailPriceRaw.trim().isEmpty ||
+        Money.parseInrToPaise(retailPriceRaw) <= 0) {
       status = BulkRowStatus.error;
       messages.add('Retail price must be greater than 0.');
     }
@@ -769,9 +824,11 @@ class BulkRepository {
       status = BulkRowStatus.error;
       messages.add('Wholesale price must be greater than 0.');
     }
-    final wholesaleMinQty =
-        hasWholesaleMinQty ? num.tryParse(wholesaleMinQtyRaw.trim()) : null;
-    if (hasWholesaleMinQty && (wholesaleMinQty == null || wholesaleMinQty <= 0)) {
+    final wholesaleMinQty = hasWholesaleMinQty
+        ? num.tryParse(wholesaleMinQtyRaw.trim())
+        : null;
+    if (hasWholesaleMinQty &&
+        (wholesaleMinQty == null || wholesaleMinQty <= 0)) {
       status = BulkRowStatus.error;
       messages.add('Wholesale minimum qty must be greater than 0.');
     }
@@ -779,7 +836,9 @@ class BulkRepository {
         wholesaleMinQty != null &&
         wholesaleMinQty != wholesaleMinQty.roundToDouble()) {
       status = BulkRowStatus.error;
-      messages.add('Wholesale minimum qty must be a whole number for QTY items.');
+      messages.add(
+        'Wholesale minimum qty must be a whole number for QTY items.',
+      );
     }
 
     if (messages.isEmpty) {
@@ -790,14 +849,16 @@ class BulkRepository {
       rowNumber: rowNumber,
       slno: slno.isEmpty ? '$rowNumber' : slno,
       sku: sku,
+      barcode: barcode,
       itemName: itemName,
       brandName: brandName,
       tamilName: tamilName,
       category: category,
       pricingType: pricingType,
       wholesaleMinQty: wholesaleMinQty,
-      wholesalePricePaise:
-          hasWholesalePrice ? Money.parseInrToPaise(wholesalePriceRaw) : null,
+      wholesalePricePaise: hasWholesalePrice
+          ? Money.parseInrToPaise(wholesalePriceRaw)
+          : null,
       retailPricePaise: Money.parseInrToPaise(retailPriceRaw),
       status: status,
       messages: messages,
@@ -815,21 +876,14 @@ class BulkRepository {
     final sku = _normalizeSku(
       _cell(headers, row, ['sku', 'item_id', 'product_id']),
     );
-    final actionRaw = _cell(
-      headers,
-      row,
-      ['action_type', 'action'],
-    );
-    final quantityRaw = _cell(
-      headers,
-      row,
-      ['quantity', 'weight', 'qty', 'value'],
-    );
-    final notes = _cell(
-      headers,
-      row,
-      ['notes', 'reason', 'remarks'],
-    );
+    final actionRaw = _cell(headers, row, ['action_type', 'action']);
+    final quantityRaw = _cell(headers, row, [
+      'quantity',
+      'weight',
+      'qty',
+      'value',
+    ]);
+    final notes = _cell(headers, row, ['notes', 'reason', 'remarks']);
 
     final messages = <String>[];
     BulkRowStatus status = BulkRowStatus.ok;
@@ -927,7 +981,9 @@ class BulkRepository {
         continue;
       }
       if ((ch == '\n' || ch == '\r') && !inQuotes) {
-        if (ch == '\r' && i + 1 < normalized.length && normalized[i + 1] == '\n') {
+        if (ch == '\r' &&
+            i + 1 < normalized.length &&
+            normalized[i + 1] == '\n') {
           i += 1;
         }
         flushRow();
@@ -949,7 +1005,11 @@ class BulkRepository {
     return map;
   }
 
-  String _cell(Map<String, int> headers, List<String> row, List<String> aliases) {
+  String _cell(
+    Map<String, int> headers,
+    List<String> row,
+    List<String> aliases,
+  ) {
     for (final alias in aliases) {
       final idx = headers[_normalizeHeader(alias)];
       if (idx != null && idx < row.length) {
@@ -959,16 +1019,16 @@ class BulkRepository {
     return '';
   }
 
-  bool _rowIsBlank(List<String> row) => row.every((cell) => cell.trim().isEmpty);
+  bool _rowIsBlank(List<String> row) =>
+      row.every((cell) => cell.trim().isEmpty);
 
-  String _normalizeHeader(String value) =>
-      value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(
-            RegExp(r'^_+|_+$'),
-            '',
-          );
+  String _normalizeHeader(String value) => value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
 
-  String _normalizeSku(String value) =>
-      ItemFormData.normalizeSku(value);
+  String _normalizeSku(String value) => ItemFormData.normalizeSku(value);
 
   String _normalizeCategory(String value) {
     final normalized = value
@@ -992,6 +1052,7 @@ class BulkRepository {
     return [
       '$slno',
       _str(row['sku']),
+      _str(row['barcode']),
       _str(row['name']),
       _str(row['brand_name']),
       _str(row['name_ta']),
@@ -1003,18 +1064,15 @@ class BulkRepository {
     ];
   }
 
-  List<String> _inventoryExportRow(Map<String, dynamic> row, {required int slno}) {
+  List<String> _inventoryExportRow(
+    Map<String, dynamic> row, {
+    required int slno,
+  }) {
     final pricingType = PricingType.fromWire(row['pricing_type']);
     final current = pricingType == PricingType.weight
         ? _formatOptionalNumber(row['inv_current_weight'], showZero: true)
         : _formatOptionalNumber(row['inv_current_qty'], showZero: true);
-    return [
-      '$slno',
-      _str(row['sku']),
-      'SET',
-      current,
-      '',
-    ];
+    return ['$slno', _str(row['sku']), 'SET', current, ''];
   }
 
   String _toCsv(List<List<String>> rows) => rows.map(_csvRow).join('\n');
@@ -1023,7 +1081,8 @@ class BulkRepository {
       row.map((cell) => _csvCell(cell)).join(',');
 
   String _csvCell(String value) {
-    final needsQuotes = value.contains(',') ||
+    final needsQuotes =
+        value.contains(',') ||
         value.contains('"') ||
         value.contains('\n') ||
         value.contains('\r');
@@ -1061,7 +1120,10 @@ class BulkRepository {
 
   List<Map<String, dynamic>> _asList(Object? value) {
     if (value is List) {
-      return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return value
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     }
     if (value is String && value.trim().isNotEmpty) {
       final decoded = jsonDecode(value);
@@ -1097,6 +1159,7 @@ class _ParsedItemRow {
     required this.rowNumber,
     required this.slno,
     required this.sku,
+    required this.barcode,
     required this.itemName,
     required this.brandName,
     required this.tamilName,
@@ -1114,6 +1177,7 @@ class _ParsedItemRow {
   final int rowNumber;
   final String slno;
   final String sku;
+  final String barcode;
   final String itemName;
   final String brandName;
   final String tamilName;
@@ -1132,6 +1196,7 @@ class _ParsedItemRow {
       rowNumber: rowNumber,
       slno: slno,
       sku: sku,
+      barcode: barcode,
       itemName: itemName,
       brandName: brandName,
       tamilName: tamilName,
@@ -1158,6 +1223,7 @@ class _ParsedItemRow {
       'rowNumber': rowNumber,
       'slno': slno,
       'sku': sku,
+      'barcode': barcode,
       'itemName': itemName,
       'brandName': brandName,
       'tamilName': tamilName,

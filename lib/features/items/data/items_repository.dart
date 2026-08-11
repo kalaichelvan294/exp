@@ -32,7 +32,7 @@ class ItemsRepository {
     if (query.isNotEmpty) {
       final escapedQuery = query.replaceAll("'", "''").toLowerCase();
       whereClause =
-          " WHERE LOWER(name) LIKE '%$escapedQuery%' OR LOWER(sku) LIKE '%$escapedQuery%' OR LOWER(category) LIKE '%$escapedQuery%'";
+          " WHERE LOWER(name) LIKE '%$escapedQuery%' OR LOWER(sku) LIKE '%$escapedQuery%' OR LOWER(COALESCE(barcode, '')) LIKE '%$escapedQuery%' OR LOWER(category) LIKE '%$escapedQuery%'";
       countWhereClause = whereClause;
     }
 
@@ -53,9 +53,77 @@ class ItemsRepository {
     );
   }
 
+  String _sqlStringOrNull(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'NULL';
+    return "'${trimmed.replaceAll("'", "''")}'";
+  }
+
+  num? _asNumOrNull(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    return num.tryParse('$value');
+  }
+
+  Future<void> _insertProductAudit({
+    required String actionType,
+    required String itemId,
+    Map<String, dynamic>? previousRow,
+    Map<String, dynamic>? newRow,
+  }) async {
+    String strFrom(Map<String, dynamic>? row, String key) {
+      if (row == null) return '';
+      return (row[key] ?? '').toString();
+    }
+
+    num? numFrom(Map<String, dynamic>? row, String key) {
+      if (row == null) return null;
+      return _asNumOrNull(row[key]);
+    }
+
+    final escapedItemId = itemId.replaceAll("'", "''");
+    final escapedAction = actionType.replaceAll("'", "''");
+
+    await _db.execute(
+      "INSERT INTO product_audit ("
+      "item_id, action_type, "
+      "previous_name, previous_category, previous_sku, previous_pricing_type, previous_rate, "
+      "new_name, new_category, new_sku, new_pricing_type, new_rate, "
+      "previous_brand_name, previous_retail_price_paise, previous_wholesale_price_paise, previous_wholesale_min_qty, "
+      "new_brand_name, new_retail_price_paise, new_wholesale_price_paise, new_wholesale_min_qty, "
+      "previous_barcode, new_barcode"
+      ") VALUES ("
+      "'$escapedItemId', '$escapedAction', "
+      "${_sqlStringOrNull(strFrom(previousRow, 'name'))}, "
+      "${_sqlStringOrNull(strFrom(previousRow, 'category'))}, "
+      "${_sqlStringOrNull(strFrom(previousRow, 'sku'))}, "
+      "${_sqlStringOrNull(strFrom(previousRow, 'pricing_type'))}, "
+      "${numFrom(previousRow, 'rate')?.toString() ?? 'NULL'}, "
+      "${_sqlStringOrNull(strFrom(newRow, 'name'))}, "
+      "${_sqlStringOrNull(strFrom(newRow, 'category'))}, "
+      "${_sqlStringOrNull(strFrom(newRow, 'sku'))}, "
+      "${_sqlStringOrNull(strFrom(newRow, 'pricing_type'))}, "
+      "${numFrom(newRow, 'rate')?.toString() ?? 'NULL'}, "
+      "${_sqlStringOrNull(strFrom(previousRow, 'brand_name'))}, "
+      "${numFrom(previousRow, 'retail_price_paise')?.toString() ?? 'NULL'}, "
+      "${numFrom(previousRow, 'wholesale_price_paise')?.toString() ?? 'NULL'}, "
+      "${numFrom(previousRow, 'wholesale_min_qty')?.toString() ?? 'NULL'}, "
+      "${_sqlStringOrNull(strFrom(newRow, 'brand_name'))}, "
+      "${numFrom(newRow, 'retail_price_paise')?.toString() ?? 'NULL'}, "
+      "${numFrom(newRow, 'wholesale_price_paise')?.toString() ?? 'NULL'}, "
+      "${numFrom(newRow, 'wholesale_min_qty')?.toString() ?? 'NULL'}, "
+      "${_sqlStringOrNull(strFrom(previousRow, 'barcode'))}, "
+      "${_sqlStringOrNull(strFrom(newRow, 'barcode'))}"
+      ")",
+    );
+  }
+
   Future<String> createItem(Map<String, dynamic> payload) async {
     final itemId = (payload['id'] ?? '').toString().replaceAll("'", "''");
     final name = (payload['name'] ?? '').toString().replaceAll("'", "''");
+    final nameTa = (payload['nameTa'] ?? payload['name_ta'] ?? '')
+        .toString()
+        .replaceAll("'", "''");
     final sku = (payload['sku'] ?? '').toString().replaceAll("'", "''");
     final category = (payload['category'] ?? 'OTHER').toString().replaceAll(
       "'",
@@ -83,12 +151,29 @@ class ItemsRepository {
     final wholesaleMinQty = num.tryParse(
       '${payload['wholesaleMinQty'] ?? payload['wholesale_min_qty'] ?? 0}',
     );
+    final barcode = (payload['barcode'] ?? '').toString().replaceAll("'", "''");
 
     final insertId = itemId.isNotEmpty
         ? itemId
         : 'item_${DateTime.now().microsecondsSinceEpoch}';
     await _db.execute(
-      "INSERT INTO products (id, name, sku, category, brand_name, pricing_type, retail_price_paise, wholesale_price_paise, wholesale_min_qty, rate) VALUES ('$insertId', '$name', '$sku', '$category', '$brand', '$pricingType', $retailPaise, ${wholesalePaise ?? 'NULL'}, ${wholesaleMinQty ?? 'NULL'}, $retailPaise)",
+      "INSERT INTO products (id, name, name_ta, sku, category, brand_name, pricing_type, retail_price_paise, wholesale_price_paise, wholesale_min_qty, rate, barcode) VALUES ('$insertId', '$name', '$nameTa', '$sku', '$category', '$brand', '$pricingType', $retailPaise, ${wholesalePaise ?? 'NULL'}, ${wholesaleMinQty ?? 'NULL'}, $retailPaise, ${_sqlStringOrNull(barcode)})",
+    );
+    await _insertProductAudit(
+      actionType: 'create',
+      itemId: insertId,
+      newRow: {
+        'name': name,
+        'category': category,
+        'sku': sku,
+        'pricing_type': pricingType,
+        'rate': retailPaise,
+        'brand_name': brand,
+        'retail_price_paise': retailPaise,
+        'wholesale_price_paise': wholesalePaise,
+        'wholesale_min_qty': wholesaleMinQty,
+        'barcode': barcode,
+      },
     );
 
     return insertId;
@@ -96,6 +181,9 @@ class ItemsRepository {
 
   Future<void> updateItem(String itemId, Map<String, dynamic> payload) async {
     final name = (payload['name'] ?? '').toString().replaceAll("'", "''");
+    final nameTa = (payload['nameTa'] ?? payload['name_ta'] ?? '')
+        .toString()
+        .replaceAll("'", "''");
     final sku = (payload['sku'] ?? '').toString().replaceAll("'", "''");
     final category = (payload['category'] ?? 'OTHER').toString().replaceAll(
       "'",
@@ -123,16 +211,51 @@ class ItemsRepository {
     final wholesaleMinQty = num.tryParse(
       '${payload['wholesaleMinQty'] ?? payload['wholesale_min_qty'] ?? 0}',
     );
+    final barcode = (payload['barcode'] ?? '').toString().replaceAll("'", "''");
     final escapedItemId = itemId.replaceAll("'", "''");
+    final existingRows = await _db.query(
+      "SELECT * FROM products WHERE id = '$escapedItemId' LIMIT 1",
+    );
+    if (existingRows.isEmpty) {
+      throw StateError('Item $itemId was not found.');
+    }
+    final previous = existingRows.first;
 
     await _db.execute(
-      "UPDATE products SET name = '$name', sku = '$sku', category = '$category', brand_name = '$brand', pricing_type = '$pricingType', retail_price_paise = $retailPaise, wholesale_price_paise = ${wholesalePaise ?? 'NULL'}, wholesale_min_qty = ${wholesaleMinQty ?? 'NULL'}, rate = $retailPaise WHERE id = '$escapedItemId'",
+      "UPDATE products SET name = '$name', name_ta = '$nameTa', sku = '$sku', category = '$category', brand_name = '$brand', pricing_type = '$pricingType', retail_price_paise = $retailPaise, wholesale_price_paise = ${wholesalePaise ?? 'NULL'}, wholesale_min_qty = ${wholesaleMinQty ?? 'NULL'}, rate = $retailPaise, barcode = ${_sqlStringOrNull(barcode)} WHERE id = '$escapedItemId'",
+    );
+    await _insertProductAudit(
+      actionType: 'update',
+      itemId: itemId,
+      previousRow: previous,
+      newRow: {
+        'name': name,
+        'category': category,
+        'sku': sku,
+        'pricing_type': pricingType,
+        'rate': retailPaise,
+        'brand_name': brand,
+        'retail_price_paise': retailPaise,
+        'wholesale_price_paise': wholesalePaise,
+        'wholesale_min_qty': wholesaleMinQty,
+        'barcode': barcode,
+      },
     );
   }
 
   Future<void> deleteItem(String itemId) async {
-    await _db.execute(
-      "DELETE FROM products WHERE id = '${itemId.replaceAll("'", "''")}'",
+    final escapedItemId = itemId.replaceAll("'", "''");
+    final existingRows = await _db.query(
+      "SELECT * FROM products WHERE id = '$escapedItemId' LIMIT 1",
+    );
+    if (existingRows.isEmpty) {
+      throw StateError('Item $itemId was not found.');
+    }
+    await _db.execute("DELETE FROM products WHERE id = '$escapedItemId'");
+    await _insertProductAudit(
+      actionType: 'delete',
+      itemId: itemId,
+      previousRow: existingRows.first,
     );
   }
 
@@ -179,20 +302,17 @@ class ItemsRepository {
     if (result.isEmpty) return InventorySettings();
     final row = result.first;
     final val = row['inv_control_enabled'];
-    final isEnabled = val == 1 ||
+    final isEnabled =
+        val == 1 ||
         val == true ||
         val?.toString() == '1' ||
         val?.toString().toLowerCase() == 'true';
     return InventorySettings(
       invControlEnabled: isEnabled,
-      invLowStockQty: num.tryParse(
-            row['inv_low_stock_qty']?.toString() ?? '10',
-          ) ??
-          10,
-      invLowStockWeight: num.tryParse(
-            row['inv_low_stock_weight']?.toString() ?? '5.0',
-          ) ??
-          5.0,
+      invLowStockQty:
+          num.tryParse(row['inv_low_stock_qty']?.toString() ?? '10') ?? 10,
+      invLowStockWeight:
+          num.tryParse(row['inv_low_stock_weight']?.toString() ?? '5.0') ?? 5.0,
     );
   }
 

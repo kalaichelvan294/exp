@@ -35,6 +35,7 @@ class ItemFormData {
     this.category = 'OTHER',
     this.brandName = '',
     required this.sku,
+    this.barcode = '',
     required this.pricingType,
     required this.retailPriceInput,
     this.wholesalePriceInput = '',
@@ -46,6 +47,7 @@ class ItemFormData {
   final String category;
   final String brandName;
   final String sku;
+  final String barcode;
   final PricingType pricingType;
 
   /// Raw rupee strings from the form fields.
@@ -113,6 +115,7 @@ class ItemFormData {
       'brandName': brandName.trim(),
       'brand_name': brandName.trim(),
       'sku': normalizeSku(sku),
+      'barcode': barcode.trim(),
       'pricingType': pricingType.wire,
       'pricing_type': pricingType.wire,
       'retailPrice': retailPaise,
