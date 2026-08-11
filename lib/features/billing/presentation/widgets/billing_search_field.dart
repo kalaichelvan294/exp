@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -390,10 +391,10 @@ class _SearchHint extends ConsumerWidget {
       text = state.message.text;
     } else if (state.cameraBusy) {
       text = state.cameraStatus;
-    } else if (state.query.isEmpty && state.cameraLive) {
-      text = 'Camera live. Tap the chip to capture the best match.';
+    } else if (state.query.isEmpty && state.cameraCaptureMode != CameraCaptureMode.none && !state.cameraTurnedOff) {
+      text = 'Camera active. Press "/" again to search or click the badge to open settings.';
     } else if (state.query.isEmpty) {
-      text = 'Type item name or SKU. Press Enter to add best match.';
+      text = 'Type item name or SKU. Press Enter to add best match. Press "/" for camera search.';
     } else if (state.searching) {
       text = 'Searching…';
     } else if (state.matches.isEmpty) {
@@ -445,8 +446,8 @@ class _CameraStatusChip extends ConsumerWidget {
       fg = AppColors.warning500;
       icon = Icons.hourglass_top;
       label = 'Scanning...';
-    } else if (state.cameraLive) {
-      // Green for live
+    } else if (state.cameraConnected && state.cameraCaptureMode != CameraCaptureMode.none) {
+      // Green for live (camera is connected and in use)
       bg = AppColors.success500.withValues(alpha: 0.16);
       fg = AppColors.success500;
       icon = Icons.videocam;
@@ -465,7 +466,7 @@ class _CameraStatusChip extends ConsumerWidget {
           : state.cameraStatus,
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: c.openCameraModal,
+        onTap: () => unawaited(c.openCameraModal()),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: bg,
@@ -473,7 +474,9 @@ class _CameraStatusChip extends ConsumerWidget {
             border: Border.all(
               color: state.cameraTurnedOff || state.cameraError.isNotEmpty
                   ? fg
-                  : (state.cameraLive ? AppColors.success500 : AppColors.neutral300),
+                  : (state.cameraConnected && state.cameraCaptureMode != CameraCaptureMode.none 
+                      ? AppColors.success500 
+                      : AppColors.neutral300),
             ),
           ),
           child: Padding(

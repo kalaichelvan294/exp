@@ -4,6 +4,13 @@ import '../domain/billing_enums.dart';
 import '../domain/cart_line.dart';
 import '../domain/product.dart';
 
+/// Camera lifecycle states.
+enum CameraCaptureMode {
+  none, // Camera not in use
+  searching, // Capturing for "/" search
+  preview, // Live preview in modal
+}
+
 /// A user-facing status message shown in the search hint / footer area.
 @immutable
 class BillingMessage {
@@ -44,12 +51,12 @@ class BillingState {
     this.selectedMatchIndex = -1,
     this.searchDropdownOpen = false,
     this.cameraConnected = false,
-    this.cameraLive = false,
     this.cameraBusy = false,
     this.cameraTurnedOff = false,
     this.cameraError = '',
     this.cameraStatus = 'Camera unavailable',
     this.cameraModalVisible = false,
+    this.cameraCaptureMode = CameraCaptureMode.none,
     this.cart = const [],
     this.selectedCartIndex = -1,
     this.qtyFocusRequestToken = 0,
@@ -75,12 +82,12 @@ class BillingState {
   final int selectedMatchIndex;
   final bool searchDropdownOpen;
   final bool cameraConnected;
-  final bool cameraLive;
   final bool cameraBusy;
   final bool cameraTurnedOff;
   final String cameraError;
   final String cameraStatus;
   final bool cameraModalVisible;
+  final CameraCaptureMode cameraCaptureMode;
 
   final List<CartLine> cart;
   final int selectedCartIndex;
@@ -130,12 +137,12 @@ class BillingState {
     int? selectedMatchIndex,
     bool? searchDropdownOpen,
     bool? cameraConnected,
-    bool? cameraLive,
     bool? cameraBusy,
     bool? cameraTurnedOff,
     String? cameraError,
     String? cameraStatus,
     bool? cameraModalVisible,
+    CameraCaptureMode? cameraCaptureMode,
     List<CartLine>? cart,
     int? selectedCartIndex,
     int? qtyFocusRequestToken,
@@ -161,12 +168,12 @@ class BillingState {
       selectedMatchIndex: selectedMatchIndex ?? this.selectedMatchIndex,
       searchDropdownOpen: searchDropdownOpen ?? this.searchDropdownOpen,
       cameraConnected: cameraConnected ?? this.cameraConnected,
-      cameraLive: cameraLive ?? this.cameraLive,
       cameraBusy: cameraBusy ?? this.cameraBusy,
       cameraTurnedOff: cameraTurnedOff ?? this.cameraTurnedOff,
       cameraError: cameraError ?? this.cameraError,
       cameraStatus: cameraStatus ?? this.cameraStatus,
       cameraModalVisible: cameraModalVisible ?? this.cameraModalVisible,
+      cameraCaptureMode: cameraCaptureMode ?? this.cameraCaptureMode,
       cart: cart ?? this.cart,
       selectedCartIndex: selectedCartIndex ?? this.selectedCartIndex,
       qtyFocusRequestToken: qtyFocusRequestToken ?? this.qtyFocusRequestToken,

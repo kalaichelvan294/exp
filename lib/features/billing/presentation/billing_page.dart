@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:async';
 import 'dart:io';
 
 import '../../../app/app_routes.dart';
@@ -97,11 +98,12 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     if (event.logicalKey == LogicalKeyboardKey.slash ||
         event.character == '/') {
-      // Toggle camera mode or focus search if camera is turned off
+      // Trigger camera search instantly or focus search if camera is turned off
       if (state.cameraTurnedOff || !Platform.isWindows) {
         _focusSearch();
       } else {
-        _c.toggleCameraMode();
+        // Trigger instant camera search (async)
+        unawaited(_c.toggleCameraMode());
       }
       return KeyEventResult.handled;
     }
@@ -141,11 +143,13 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     // Show camera modal if needed
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (cameraModalVisible && Navigator.canPop(context) == false) {
+      if (cameraModalVisible && !Navigator.of(context, rootNavigator: true).canPop()) {
         showDialog(
           context: context,
-          builder: (ctx) =>
-              CameraControlModal(state: billingState),
+          builder: (ctx) => CameraControlModal(
+            state: billingState,
+            cameraController: ref.read(billingControllerProvider.notifier).cameraController,
+          ),
         ).then((_) {
           ref.read(billingControllerProvider.notifier).closeCameraModal();
         });

@@ -10,9 +10,10 @@ import '../../application/billing_state.dart';
 
 /// Modal for controlling camera settings and viewing live feed.
 class CameraControlModal extends ConsumerWidget {
-  const CameraControlModal({super.key, required this.state});
+  const CameraControlModal({super.key, required this.state, required this.cameraController});
 
   final BillingState state;
+  final CameraController? cameraController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,12 +47,16 @@ class CameraControlModal extends ConsumerWidget {
             ),
             const Divider(),
 
-            // Live feed preview (if camera is available)
-            if (Platform.isWindows && state.cameraConnected)
+            // Live feed preview (if camera is available and not turned off)
+            if (Platform.isWindows && 
+                !state.cameraTurnedOff && 
+                state.cameraConnected &&
+                cameraController != null &&
+                cameraController!.value.isInitialized)
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.x16),
-                  child: _CameraPreview(state: state),
+                  child: _CameraPreview(controller: cameraController!),
                 ),
               )
             else
@@ -151,13 +156,7 @@ class CameraControlModal extends ConsumerWidget {
                   // Camera toggle button
                   if (Platform.isWindows)
                     ElevatedButton.icon(
-                      onPressed: () {
-                        c.toggleCameraOff();
-                        // Close modal if turning off
-                        if (!state.cameraTurnedOff && Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        }
-                      },
+                      onPressed: c.toggleCameraOff,
                       icon: Icon(
                         state.cameraTurnedOff
                             ? Icons.videocam
@@ -217,7 +216,7 @@ class CameraControlModal extends ConsumerWidget {
       return AppColors.warning500;
     } else if (state.cameraBusy) {
       return AppColors.warning500;
-    } else if (state.cameraLive && state.cameraConnected) {
+    } else if (state.cameraConnected && state.cameraCaptureMode != CameraCaptureMode.none) {
       return AppColors.success500;
     } else {
       return AppColors.neutral500;
@@ -231,7 +230,7 @@ class CameraControlModal extends ConsumerWidget {
       return Icons.videocam_off;
     } else if (state.cameraBusy) {
       return Icons.hourglass_top;
-    } else if (state.cameraLive && state.cameraConnected) {
+    } else if (state.cameraConnected && state.cameraCaptureMode != CameraCaptureMode.none) {
       return Icons.videocam;
     } else {
       return Icons.help;
@@ -245,7 +244,7 @@ class CameraControlModal extends ConsumerWidget {
       return 'Camera Turned Off';
     } else if (state.cameraBusy) {
       return 'Scanning...';
-    } else if (state.cameraLive && state.cameraConnected) {
+    } else if (state.cameraConnected && state.cameraCaptureMode == CameraCaptureMode.preview) {
       return 'Camera Live';
     } else if (!state.cameraConnected) {
       return 'Camera Offline';
@@ -255,59 +254,15 @@ class CameraControlModal extends ConsumerWidget {
   }
 }
 
-/// Live camera preview widget.
-class _CameraPreview extends ConsumerStatefulWidget {
-  const _CameraPreview({required this.state});
+/// Live camera preview widget using shared camera controller.
+class _CameraPreview extends StatelessWidget {
+  const _CameraPreview({required this.controller});
 
-  final BillingState state;
-
-  @override
-  ConsumerState<_CameraPreview> createState() => _CameraPreviewState();
-}
-
-class _CameraPreviewState extends ConsumerState<_CameraPreview> {
-  CameraController? _previewController;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializePreview();
-  }
-
-  Future<void> _initializePreview() async {
-    try {
-      if (!Platform.isWindows || !widget.state.cameraConnected) {
-        return;
-      }
-
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) return;
-
-      _previewController = CameraController(
-        cameras.first,
-        ResolutionPreset.medium,
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
-      );
-
-      await _previewController?.initialize();
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (_) {
-      // Silently fail
-    }
-  }
-
-  @override
-  void dispose() {
-    _previewController?.dispose();
-    super.dispose();
-  }
+  final CameraController controller;
 
   @override
   Widget build(BuildContext context) {
-    if (_previewController == null || !_previewController!.value.isInitialized) {
+    if (!controller.value.isInitialized) {
       return Container(
         color: AppColors.neutral100,
         alignment: Alignment.center,
@@ -317,7 +272,7 @@ class _CameraPreviewState extends ConsumerState<_CameraPreview> {
 
     return ClipRRect(
       borderRadius: AppRadius.card,
-      child: CameraPreview(_previewController!),
+      child: CameraPreview(controller),
     );
   }
 }

@@ -48,7 +48,7 @@ class BillingController extends Notifier<BillingState> {
     Future.microtask(() async {
       await loadHeldBills();
       await loadRecentBills();
-      await ensureCameraReady();
+      // DO NOT initialize camera here - only on demand
     });
     return const BillingState();
   }
@@ -95,23 +95,26 @@ class BillingController extends Notifier<BillingState> {
     }
   }
 
-  Future<void> ensureCameraReady() async {
-    if (!Platform.isWindows) {
+  /// Initialize camera for a specific capture mode.
+  /// Mode 'searching' = capture one frame and search
+  /// Mode 'preview' = keep camera live for modal preview
+  Future<void> _initCameraForMode(CameraCaptureMode mode) async {
+    if (!Platform.isWindows || state.cameraTurnedOff) {
       state = state.copyWith(
         cameraConnected: false,
-        cameraLive: false,
         cameraBusy: false,
-        cameraStatus: 'Camera is Windows-only',
+        cameraStatus: state.cameraTurnedOff ? 'Camera turned off' : 'Camera is Windows-only',
       );
       return;
     }
 
-    final existing = _cameraController;
-    if (existing != null && existing.value.isInitialized) {
+    // Already initialized and in the right mode
+    if (_cameraController != null && 
+        _cameraController!.value.isInitialized &&
+        state.cameraCaptureMode == mode) {
       state = state.copyWith(
         cameraConnected: true,
-        cameraLive: true,
-        cameraBusy: state.cameraBusy,
+        cameraBusy: false,
         cameraStatus: 'Camera live',
       );
       return;
@@ -122,7 +125,81 @@ class BillingController extends Notifier<BillingState> {
       if (cameras.isEmpty) {
         state = state.copyWith(
           cameraConnected: false,
-          cameraLive: false,
+          cameraBusy: false,
+          cameraStatus: 'No camera detected',
+        );
+        return;
+      }
+
+      final controller = CameraController(
+        cameras.first,
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+      await controller.initialize();
+      
+      // Dispose old controller and set new one
+      final previous = _cameraController;
+      _cameraController = controller;
+      if (previous != null && previous != controller) {
+        unawaited(previous.dispose());
+      }
+      
+      state = state.copyWith(
+        cameraCaptureMode: mode,
+        cameraConnected: true,
+        cameraBusy: false,
+        cameraStatus: 'Camera live',
+      );
+    } on CameraException catch (e) {
+      state = state.copyWith(
+        cameraConnected: false,
+        cameraBusy: false,
+        cameraError: e.description ?? e.toString(),
+        cameraStatus: 'Camera error',
+        message: BillingMessage(
+          'Camera setup failed: ${e.description ?? e.toString()}',
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  /// Dispose camera when not needed.
+  void _disposeCameraIfNeeded() {
+    if (_cameraController != null) {
+      final controller = _cameraController!;
+      _cameraController = null;
+      unawaited(controller.dispose());
+    }
+  }
+
+  Future<void> ensureCameraReady() async {
+    if (!Platform.isWindows) {
+      state = state.copyWith(
+        cameraConnected: false,
+        cameraBusy: false,
+        cameraStatus: 'Camera is Windows-only',
+      );
+      return;
+    }
+
+    final existing = _cameraController;
+    if (existing != null && existing.value.isInitialized) {
+      state = state.copyWith(
+        cameraConnected: true,
+        cameraBusy: false,
+        cameraStatus: 'Camera live',
+      );
+      return;
+    }
+
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        state = state.copyWith(
+          cameraConnected: false,
           cameraBusy: false,
           cameraStatus: 'No camera detected',
         );
@@ -143,14 +220,12 @@ class BillingController extends Notifier<BillingState> {
       }
       state = state.copyWith(
         cameraConnected: true,
-        cameraLive: true,
-        cameraBusy: state.cameraBusy,
+        cameraBusy: false,
         cameraStatus: 'Camera live',
       );
     } on CameraException catch (e) {
       state = state.copyWith(
         cameraConnected: false,
-        cameraLive: false,
         cameraBusy: false,
         cameraStatus: 'Camera unavailable',
         message: BillingMessage(
@@ -162,19 +237,25 @@ class BillingController extends Notifier<BillingState> {
   }
 
   Future<void> captureCameraSearch() async {
-    state = state.copyWith(cameraBusy: true, cameraStatus: 'Capturing frame...');
+    if (state.cameraTurnedOff) {
+      return;
+    }
+    
+    state = state.copyWith(cameraBusy: true, cameraStatus: 'Initializing camera...');
     try {
-      await ensureCameraReady();
+      // Initialize camera for searching
+      await _initCameraForMode(CameraCaptureMode.searching);
+      
       final controller = _cameraController;
       if (controller == null || !controller.value.isInitialized) {
         state = state.copyWith(
           cameraBusy: false,
-          cameraLive: false,
           cameraStatus: 'Camera unavailable',
         );
         return;
       }
 
+      state = state.copyWith(cameraBusy: true, cameraStatus: 'Capturing frame...');
       final capture = await controller.takePicture();
       final embeddingRepo = ref.read(productEmbeddingRepositoryProvider);
       final barcode = await embeddingRepo.decodeBarcodeFromImageFile(
@@ -191,6 +272,7 @@ class BillingController extends Notifier<BillingState> {
               imageUrl: 'barcode:$normalizedBarcode',
             )
           : await embeddingRepo.findBestMatchFromImageFile(File(capture.path));
+      
       if (match == null) {
         state = state.copyWith(
           query: '',
@@ -198,96 +280,113 @@ class BillingController extends Notifier<BillingState> {
           selectedMatchIndex: -1,
           searchDropdownOpen: true,
           cameraBusy: false,
+          cameraCaptureMode: CameraCaptureMode.none,
           cameraStatus: 'No match found',
           message: const BillingMessage('No product matched the camera image.'),
         );
+        _disposeCameraIfNeeded();
         return;
       }
 
-        state = state.copyWith(
-          query: '',
-          matches: [match.product],
-          selectedMatchIndex: 0,
-          searchDropdownOpen: true,
-          cameraBusy: false,
-          cameraStatus: barcodeMatch != null
+      state = state.copyWith(
+        query: '',
+        matches: [match.product],
+        selectedMatchIndex: 0,
+        searchDropdownOpen: true,
+        cameraBusy: false,
+        cameraCaptureMode: CameraCaptureMode.none,
+        cameraStatus: barcodeMatch != null
+            ? 'Barcode match: ${match.product.displayName}'
+            : 'Best match: ${match.product.displayName}',
+        message: BillingMessage(
+          barcodeMatch != null
               ? 'Barcode match: ${match.product.displayName}'
-              : 'Best match: ${match.product.displayName}',
-          message: BillingMessage(
-            barcodeMatch != null
-                ? 'Barcode match: ${match.product.displayName}'
-                : 'Camera match: ${match.product.displayName} '
-                    '(${(match.similarity * 100).toStringAsFixed(1)}%)',
-          ),
-        );
+              : 'Camera match: ${match.product.displayName} '
+                  '(${(match.similarity * 100).toStringAsFixed(1)}%)',
+        ),
+      );
+      _disposeCameraIfNeeded();
     } on CameraException catch (e) {
       state = state.copyWith(
         cameraBusy: false,
-        cameraLive: false,
         cameraError: e.description ?? e.toString(),
+        cameraCaptureMode: CameraCaptureMode.none,
         cameraStatus: 'Camera search failed',
         message: BillingMessage(
           'Camera search failed: ${e.description ?? e.toString()}',
           isError: true,
         ),
       );
+      _disposeCameraIfNeeded();
     } on StateError catch (e) {
       state = state.copyWith(
         cameraBusy: false,
-        cameraLive: false,
         cameraError: e.toString(),
+        cameraCaptureMode: CameraCaptureMode.none,
         cameraStatus: 'Camera search failed',
         message: BillingMessage(
           'Camera search failed: ${e.toString()}',
           isError: true,
         ),
       );
+      _disposeCameraIfNeeded();
     } catch (e) {
       state = state.copyWith(
         cameraBusy: false,
-        cameraLive: false,
         cameraError: e.toString(),
+        cameraCaptureMode: CameraCaptureMode.none,
         cameraStatus: 'Camera search failed',
         message: BillingMessage(
           'Camera search failed: ${e.toString()}',
           isError: true,
         ),
       );
+      _disposeCameraIfNeeded();
     }
   }
 
-  /// Toggles camera mode on/off when "/" key is pressed.
-  /// If camera is turned off, this won't do anything (user must open modal to re-enable).
-  void toggleCameraMode() {
+  /// Triggered by "/" key - instantly starts camera search if camera is not turned off.
+  Future<void> toggleCameraMode() async {
     if (state.cameraTurnedOff) {
-      // Camera is turned off, ignore toggle
+      // Camera turned off, focus search instead
       return;
     }
-    state = state.copyWith(
-      cameraLive: !state.cameraLive,
-      cameraBusy: false,
-      cameraStatus: state.cameraLive ? 'Camera stopped' : 'Camera live',
-    );
+    await captureCameraSearch();
   }
 
-  /// Opens the camera control modal.
-  void openCameraModal() {
+  /// Opens the camera control modal - initializes camera for preview.
+  Future<void> openCameraModal() async {
+    if (!state.cameraTurnedOff) {
+      // Initialize camera for live preview in modal
+      await _initCameraForMode(CameraCaptureMode.preview);
+    }
     state = state.copyWith(cameraModalVisible: true);
   }
 
-  /// Closes the camera control modal.
+  /// Closes the camera control modal - disposes camera.
   void closeCameraModal() {
-    state = state.copyWith(cameraModalVisible: false);
+    state = state.copyWith(
+      cameraModalVisible: false,
+      cameraCaptureMode: CameraCaptureMode.none,
+    );
+    _disposeCameraIfNeeded();
   }
 
   /// Toggles camera off/on via the modal. When turned off, "/" key won't work.
   void toggleCameraOff() {
+    final newState = !state.cameraTurnedOff;
     state = state.copyWith(
-      cameraTurnedOff: !state.cameraTurnedOff,
-      cameraLive: false,
-      cameraBusy: false,
-      cameraStatus: state.cameraTurnedOff ? 'Camera turned on' : 'Camera turned off',
+      cameraTurnedOff: newState,
+      cameraCaptureMode: newState ? CameraCaptureMode.none : CameraCaptureMode.preview,
+      cameraStatus: newState ? 'Camera turned off' : 'Camera turned on',
     );
+    if (newState) {
+      // Dispose when turning off
+      _disposeCameraIfNeeded();
+    } else if (state.cameraModalVisible) {
+      // Re-initialize if modal is still open
+      unawaited(_initCameraForMode(CameraCaptureMode.preview));
+    }
   }
 
   /// Re-runs the current search and opens the dropdown (global / focus action).
@@ -995,6 +1094,9 @@ class BillingController extends Notifier<BillingState> {
     }
     return const <String, dynamic>{};
   }
+
+  /// Getter to access the camera controller for the modal.
+  CameraController? get cameraController => _cameraController;
 }
 
 final billingControllerProvider =

@@ -10,16 +10,22 @@ Flutter **Windows desktop** POS app (`pos-294`).
   - Allows negative inventory (no over-selling validation).
   - Updates `inv_current_qty` for unit items or `inv_current_weight` for weight items.
 - **Camera search keyboard shortcut** for seamless workflow.
-  - Press `/` to toggle camera live mode ON/OFF (if camera is enabled and Windows platform).
-  - Press `/` to focus search field if camera is turned off (fallback to text search).
-  - Click camera badge to open settings modal with live preview and toggle-off button.
-- **Camera control modal** with live feed preview.
+  - Press `/` to instantly capture a frame and search for products (camera activates on demand).
+  - Press `/` to focus search field if camera is turned off.
+  - Click camera badge to open settings modal with live preview and control options.
+- **Camera control modal** with live feed preview and persistent off/on toggle.
   - Shows live camera preview so users can see what the camera sees.
-  - Displays camera status (Live, Offline, Error, Turned Off) with color-coded badge.
+  - Displays camera status with color-coded badge (Green/Orange/Red/Yellow/Gray).
   - "Turn Camera Off/On" button for persistent camera preference toggle.
+  - Camera automatically disposes when modal closes to free resources.
   - Accessible via camera badge click from Sales Desk search area.
-- **Camera badge color states**.
-  - 🟢 Green: Camera live and connected.
+- **Camera lifecycle management** (graceful shutdown & on-demand initialization).
+  - Camera is NOT initialized on app startup (lazy load only).
+  - Camera only exists when actively needed: "/" search or modal preview.
+  - Graceful disposal when not in use prevents "Camera must be disposed before creating again" errors.
+  - Single camera controller shared between "/" search and modal preview.
+- **Camera badge color states** (5-state system).
+  - 🟢 Green: Camera connected and actively capturing.
   - 🟠 Orange: Camera turned off (requires modal to re-enable).
   - 🔴 Red: Camera error (shows error message in tooltip).
   - 🟡 Yellow: Scanning/capturing frame.
@@ -92,14 +98,15 @@ Each feature follows clean architecture:
 
 - Keyboard-first cart entry and checkout flow with automatic inventory deduction
 - 3-column image search cards with keyboard navigation
-- `/` shortcut to toggle camera live mode or focus search
 - **Camera-based product search** (Windows only)
-  - Press `/` to activate camera live mode or toggle it off (persistent state)
+  - Press `/` to instantly capture and search (camera activates on demand)
   - Click camera badge to open settings modal with live preview
-  - Camera status chip shows Live (green), Offline (gray), Error (red), or Turned Off (orange)
+  - Camera status chip shows Live (green), Offline (gray), Error (red), Scanning (yellow), or Turned Off (orange)
   - Automatically tries barcode extraction first (priority match at 100% similarity)
   - Falls back to ONNX image embedding similarity for products without barcodes
-  - Live camera feed preview in modal allows user to see what camera captures
+  - Live camera feed preview in modal allows user to see what camera sees
+  - Single camera controller shared between "/" search and modal preview
+  - Graceful disposal prevents "Camera must be disposed" errors
 - **Automatic inventory deduction**
   - Inventory is deducted when bill is successfully saved
   - On bill update, old inventory is restored and new inventory is deducted
@@ -205,8 +212,8 @@ When "Refresh embeddings" is clicked in Settings:
 ### Camera Search (Sales Desk)
 
 **Workflow**:
-1. Press `/` to toggle camera live mode ON/OFF (or focus search if camera is turned off)
-2. When camera is live, it captures frames continuously:
+1. Press `/` to instantly capture a frame and search (camera activates on demand).
+2. Camera captures and processes the frame:
    - Sent to barcode decoder → if match found, return 100% similarity (exact match)
    - Sent to embedding inference → compute cosine-similarity against indexed products
    - Best match (barcode or embedding) is displayed in search results
@@ -217,16 +224,25 @@ When "Refresh embeddings" is clicked in Settings:
 - Shows live camera preview so user can see what the camera sees
 - Displays camera status with color-coded badge (Green/Orange/Red/Yellow/Gray)
 - "Turn Camera Off/On" button to disable/enable camera search (persistent toggle)
-- Works seamlessly with "/" key binding for on/off toggling
+- Camera automatically disposed when modal closes (graceful shutdown)
+
+**Camera Lifecycle**:
+- Camera is **NOT** initialized on app startup (lazy load only)
+- Camera only initialized when needed:
+  - "/" key pressed → capture one frame and search, then dispose
+  - Camera badge clicked → initialize for live preview in modal
+  - Modal closed → dispose camera and free resources
+- Single camera controller shared between "/" search and modal preview
+- Prevents "Camera must be disposed before creating again" errors through graceful lifecycle management
 
 **Camera Badge States**:
-- 🟢 **Live**: Camera connected and actively capturing
-- 🟡 **Scanning**: Currently processing a frame (busy state)
+- 🟢 **Live**: Camera connected and actively capturing (preview mode in modal)
+- 🟡 **Scanning**: Currently processing a frame (busy state during "/" search)
 - 🟠 **Off**: Camera turned off via modal (requires re-enabling)
 - 🔴 **Error**: Camera error occurred (shows error in tooltip)
 - ⚫ **Offline**: Camera unavailable or not connected
 
-**Platform support**: Camera is Windows-only. On other platforms, camera status shows "Camera is Windows-only".
+**Platform support**: Camera is Windows-only. On other platforms, "/" focuses search field instead.
 
 ## Inventory Management
 
