@@ -42,7 +42,18 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
   double _overlayWidth = 0;
 
   @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onSearchFocusChanged);
+  }
+
+  void _onSearchFocusChanged() {
+    _c.onSearchFocusChanged(widget.focusNode.hasFocus);
+  }
+
+  @override
   void dispose() {
+    widget.focusNode.removeListener(_onSearchFocusChanged);
     _removeOverlay();
     _controller.dispose();
     super.dispose();
@@ -184,10 +195,6 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
                   ),
                 ),
               ),
-            ),
-            Focus(
-              onFocusChange: (focused) => _c.onSearchFocusChanged(focused),
-              child: const SizedBox(width: 0, height: 0), // Invisible widget for focus tracking
             ),
             const SizedBox(width: AppSpacing.x8),
             _CameraStatusChip(state: state),

@@ -36,10 +36,13 @@ class BillingPage extends ConsumerStatefulWidget {
 
 class _BillingPageState extends ConsumerState<BillingPage> {
   final _searchFocus = FocusNode();
+  late final dynamic _earlyKeyHandler;
 
   @override
   void initState() {
     super.initState();
+    _earlyKeyHandler = (KeyEvent event) => _handleGlobalKeyEvent(event);
+    FocusManager.instance.addEarlyKeyEventHandler(_earlyKeyHandler);
     final billId = widget.editBillId?.trim();
     if (billId != null && billId.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -50,6 +53,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
   @override
   void dispose() {
+    FocusManager.instance.removeEarlyKeyEventHandler(_earlyKeyHandler);
     _searchFocus.dispose();
     super.dispose();
   }
@@ -59,6 +63,19 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   void _focusSearch() {
     _c.refreshSearch();
     _searchFocus.requestFocus();
+  }
+
+  KeyEventResult _handleGlobalKeyEvent(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return KeyEventResult.ignored;
+    final isSlash =
+        event.logicalKey == LogicalKeyboardKey.slash || event.character == '/';
+    if (!isSlash) return KeyEventResult.ignored;
+    final state = ref.read(billingControllerProvider);
+    _focusSearch();
+    if (!state.cameraTurnedOff && Platform.isWindows) {
+      unawaited(_c.captureCameraSearch());
+    }
+    return KeyEventResult.handled;
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -94,17 +111,6 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     if (event.logicalKey == LogicalKeyboardKey.delete) {
       if (_c.removeSelectedLine()) return KeyEventResult.handled;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.slash ||
-        event.character == '/') {
-      // "/" always focuses search bar first
-      _focusSearch();
-      // If camera is on and Windows, also start camera search
-      if (!state.cameraTurnedOff && Platform.isWindows) {
-        unawaited(_c.captureCameraSearch());
-      }
-      return KeyEventResult.handled;
     }
 
     if (ctrl) {
