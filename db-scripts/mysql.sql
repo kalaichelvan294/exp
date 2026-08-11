@@ -1,13 +1,9 @@
--- MySQL migration for the POS application.
+-- MySQL for the POS application.
 -- This is the canonical MySQL schema used by the app, with compatibility aliases
--- for legacy Postgres table names kept so older scripts continue to work.
 
 CREATE DATABASE IF NOT EXISTS `pos294`;
 USE `pos294`;
 
-DROP VIEW IF EXISTS app_lifecycle_logs_legacy;
-DROP VIEW IF EXISTS bulk_import_batch;
-DROP VIEW IF EXISTS held_bills;
 DROP TABLE IF EXISTS product_audit;
 DROP TABLE IF EXISTS inventory_audit;
 DROP TABLE IF EXISTS bill_audit;
@@ -19,6 +15,7 @@ DROP TABLE IF EXISTS inventory_settings;
 DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS bills;
 DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS product_embeddings;
 
 CREATE TABLE products (
     id VARCHAR(255) PRIMARY KEY,
@@ -36,10 +33,19 @@ CREATE TABLE products (
     name_ta VARCHAR(255) NOT NULL DEFAULT '',
     brand_name VARCHAR(255) NOT NULL DEFAULT '',
     retail_price_paise INT NOT NULL DEFAULT 0,
+    barcode VARCHAR(255) NULL,
     wholesale_price_paise INT NULL,
     wholesale_min_qty DECIMAL(12,3) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE product_embeddings (
+    embedding_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL, -- plain reference, no FK
+    image_url VARCHAR(255) NOT NULL,
+    embedding JSON NOT NULL, 
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE bills (
@@ -156,8 +162,13 @@ CREATE TABLE product_audit (
     new_brand_name VARCHAR(255),
     new_retail_price_paise INT,
     new_wholesale_price_paise INT,
-    new_wholesale_min_qty DECIMAL(12,3)
+    new_wholesale_min_qty DECIMAL(12,3),
+
+    -- Barcode changes
+    previous_barcode VARCHAR(255),
+    new_barcode VARCHAR(255)
 );
+
 
 CREATE TABLE settings (
     id VARCHAR(255) PRIMARY KEY,
@@ -190,17 +201,6 @@ ON DUPLICATE KEY UPDATE
     inv_control_enabled = VALUES(inv_control_enabled),
     inv_low_stock_qty = VALUES(inv_low_stock_qty),
     inv_low_stock_weight = VALUES(inv_low_stock_weight);
-
--- Legacy compatibility aliases for older scripts.
-CREATE VIEW held_bills AS
-SELECT hold_id, bill_id, bill_data AS bill_data_json, created_at AS held_at, updated_at
-FROM bill_holds;
-
-CREATE VIEW bulk_import_batch AS
-SELECT * FROM bulk_batches;
-
-CREATE VIEW app_lifecycle_logs_legacy AS
-SELECT * FROM app_lifecycle_logs;
 
 -- -----------------------------------------------------------------------------
 -- Application database user (read/write on app tables only, no audit tables)
