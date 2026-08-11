@@ -82,7 +82,7 @@ Set the root path used for item images, for example:
 
 Image conventions:
 
-- Item images are saved and resolved using filename format: `<SKU>_master.jpg`
+- Item images are saved and resolved using filename format: `<SKU>_MASTER.jpg`
 - Only JPG/JPEG files are supported in item image selection flow
 
 ### Categories

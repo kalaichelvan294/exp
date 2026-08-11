@@ -240,7 +240,7 @@ class _ResultsGrid extends ConsumerWidget {
           crossAxisCount: columns,
           mainAxisSpacing: AppSpacing.x12,
           crossAxisSpacing: AppSpacing.x12,
-          childAspectRatio: 1.22,
+          childAspectRatio: 0.86,
         ),
         itemCount: matches.length,
         itemBuilder: (context, index) {
@@ -267,7 +267,8 @@ class _ResultsGrid extends ConsumerWidget {
                 ),
                 child: Column(
                   children: [
-                    Expanded(
+                    AspectRatio(
+                      aspectRatio: 1,
                       child: Stack(
                         children: [
                           Positioned.fill(
@@ -342,9 +343,11 @@ class _ResultsGrid extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  product.nameTa.isNotEmpty
-                                      ? product.nameTa
-                                      : '—',
+                                  product.displayName.trim().isNotEmpty
+                                      ? product.displayName
+                                      : (product.sku.trim().isNotEmpty
+                                            ? product.sku
+                                            : 'Unnamed item'),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodyMedium
@@ -352,14 +355,14 @@ class _ResultsGrid extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: AppSpacing.x4),
                                 Text(
-                                  product.name,
+                                  'SKU: ${product.sku.trim().isNotEmpty ? product.sku : '—'}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                                 const SizedBox(height: AppSpacing.x4),
                                 Text(
-                                  'Brand: ${product.brandName.isNotEmpty ? product.brandName : '—'}',
+                                  'Brand: ${product.brandName.trim().isNotEmpty ? product.brandName : 'Unbranded'}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodySmall

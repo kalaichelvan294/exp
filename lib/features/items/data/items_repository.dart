@@ -145,19 +145,32 @@ class ItemsRepository {
           '${payload['retailPricePaise'] ?? payload['retailPrice'] ?? payload['retail_price_paise'] ?? payload['rate'] ?? 0}',
         ) ??
         0;
-    final wholesalePaise = int.tryParse(
-      '${payload['wholesalePricePaise'] ?? payload['wholesalePrice'] ?? payload['wholesale_price_paise'] ?? 0}',
-    );
-    final wholesaleMinQty = num.tryParse(
-      '${payload['wholesaleMinQty'] ?? payload['wholesale_min_qty'] ?? 0}',
-    );
+    final wholesaleRaw =
+        payload['wholesalePricePaise'] ??
+        payload['wholesalePrice'] ??
+        payload['wholesale_price_paise'];
+    final wholesalePaise = wholesaleRaw == null
+        ? null
+        : int.tryParse('$wholesaleRaw');
+    final wholesaleMinRaw =
+        payload['wholesaleMinQty'] ?? payload['wholesale_min_qty'];
+    var wholesaleMinQty = wholesaleMinRaw == null
+        ? null
+        : num.tryParse('$wholesaleMinRaw');
+    var effectiveWholesalePaise =
+        (wholesalePaise != null && wholesalePaise > 0) ? wholesalePaise : null;
+    if (effectiveWholesalePaise == null) {
+      wholesaleMinQty = null;
+    } else if (wholesaleMinQty != null && wholesaleMinQty <= 0) {
+      wholesaleMinQty = null;
+    }
     final barcode = (payload['barcode'] ?? '').toString().replaceAll("'", "''");
 
     final insertId = itemId.isNotEmpty
         ? itemId
         : 'item_${DateTime.now().microsecondsSinceEpoch}';
     await _db.execute(
-      "INSERT INTO products (id, name, name_ta, sku, category, brand_name, pricing_type, retail_price_paise, wholesale_price_paise, wholesale_min_qty, rate, barcode) VALUES ('$insertId', '$name', '$nameTa', '$sku', '$category', '$brand', '$pricingType', $retailPaise, ${wholesalePaise ?? 'NULL'}, ${wholesaleMinQty ?? 'NULL'}, $retailPaise, ${_sqlStringOrNull(barcode)})",
+      "INSERT INTO products (id, name, name_ta, sku, category, brand_name, pricing_type, retail_price_paise, wholesale_price_paise, wholesale_min_qty, rate, barcode) VALUES ('$insertId', '$name', '$nameTa', '$sku', '$category', '$brand', '$pricingType', $retailPaise, ${effectiveWholesalePaise ?? 'NULL'}, ${wholesaleMinQty ?? 'NULL'}, $retailPaise, ${_sqlStringOrNull(barcode)})",
     );
     await _insertProductAudit(
       actionType: 'create',
@@ -170,7 +183,7 @@ class ItemsRepository {
         'rate': retailPaise,
         'brand_name': brand,
         'retail_price_paise': retailPaise,
-        'wholesale_price_paise': wholesalePaise,
+        'wholesale_price_paise': effectiveWholesalePaise,
         'wholesale_min_qty': wholesaleMinQty,
         'barcode': barcode,
       },
@@ -205,12 +218,25 @@ class ItemsRepository {
           '${payload['retailPricePaise'] ?? payload['retailPrice'] ?? payload['retail_price_paise'] ?? payload['rate'] ?? 0}',
         ) ??
         0;
-    final wholesalePaise = int.tryParse(
-      '${payload['wholesalePricePaise'] ?? payload['wholesalePrice'] ?? payload['wholesale_price_paise'] ?? 0}',
-    );
-    final wholesaleMinQty = num.tryParse(
-      '${payload['wholesaleMinQty'] ?? payload['wholesale_min_qty'] ?? 0}',
-    );
+    final wholesaleRaw =
+        payload['wholesalePricePaise'] ??
+        payload['wholesalePrice'] ??
+        payload['wholesale_price_paise'];
+    final wholesalePaise = wholesaleRaw == null
+        ? null
+        : int.tryParse('$wholesaleRaw');
+    final wholesaleMinRaw =
+        payload['wholesaleMinQty'] ?? payload['wholesale_min_qty'];
+    var wholesaleMinQty = wholesaleMinRaw == null
+        ? null
+        : num.tryParse('$wholesaleMinRaw');
+    var effectiveWholesalePaise =
+        (wholesalePaise != null && wholesalePaise > 0) ? wholesalePaise : null;
+    if (effectiveWholesalePaise == null) {
+      wholesaleMinQty = null;
+    } else if (wholesaleMinQty != null && wholesaleMinQty <= 0) {
+      wholesaleMinQty = null;
+    }
     final barcode = (payload['barcode'] ?? '').toString().replaceAll("'", "''");
     final escapedItemId = itemId.replaceAll("'", "''");
     final existingRows = await _db.query(
@@ -222,7 +248,7 @@ class ItemsRepository {
     final previous = existingRows.first;
 
     await _db.execute(
-      "UPDATE products SET name = '$name', name_ta = '$nameTa', sku = '$sku', category = '$category', brand_name = '$brand', pricing_type = '$pricingType', retail_price_paise = $retailPaise, wholesale_price_paise = ${wholesalePaise ?? 'NULL'}, wholesale_min_qty = ${wholesaleMinQty ?? 'NULL'}, rate = $retailPaise, barcode = ${_sqlStringOrNull(barcode)} WHERE id = '$escapedItemId'",
+      "UPDATE products SET name = '$name', name_ta = '$nameTa', sku = '$sku', category = '$category', brand_name = '$brand', pricing_type = '$pricingType', retail_price_paise = $retailPaise, wholesale_price_paise = ${effectiveWholesalePaise ?? 'NULL'}, wholesale_min_qty = ${wholesaleMinQty ?? 'NULL'}, rate = $retailPaise, barcode = ${_sqlStringOrNull(barcode)} WHERE id = '$escapedItemId'",
     );
     await _insertProductAudit(
       actionType: 'update',
@@ -236,7 +262,7 @@ class ItemsRepository {
         'rate': retailPaise,
         'brand_name': brand,
         'retail_price_paise': retailPaise,
-        'wholesale_price_paise': wholesalePaise,
+        'wholesale_price_paise': effectiveWholesalePaise,
         'wholesale_min_qty': wholesaleMinQty,
         'barcode': barcode,
       },

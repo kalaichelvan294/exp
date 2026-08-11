@@ -8,7 +8,7 @@ Pre-requisite for implementing the image search feature:
 - We need to fill out the product embeddings table with image vector data
 - Where the images will be present - use images folder path configured in item settings
 - For each product there can be 6 images: For example item sky is T101
-  - T101_master.jpg
+  - T101_MASTER.jpg
   - T101_1.jpg
   - T101_2.jpg
   - T101_3.jpg

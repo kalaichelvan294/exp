@@ -9,6 +9,7 @@ import '../../../app/app_routes.dart';
 import '../../../app/module_scaffold.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../shared/widgets/app_card.dart';
+import '../../bills/application/bills_controller.dart';
 import '../application/billing_controller.dart';
 import '../domain/money.dart';
 import 'widgets/billing_search_field.dart';
@@ -442,6 +443,7 @@ class _HeaderActions extends ConsumerWidget {
     if (confirmed != true) return;
     final ok = await c.deleteCurrentBill();
     if (ok && context.mounted) {
+      ref.invalidate(billsControllerProvider);
       context.go(AppRoutes.bills.path);
     }
   }

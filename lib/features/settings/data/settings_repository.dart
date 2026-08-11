@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/db_connection.dart';
@@ -9,6 +11,29 @@ class SettingsRepository {
   SettingsRepository(this._db);
 
   final DbConnection _db;
+  static const String _b64Prefix = 'b64:';
+
+  String _sqlEscape(String value) =>
+      value.replaceAll('\\', '\\\\').replaceAll("'", "''");
+
+  String _encodeSettingValue(String key, String value) {
+    if (key == 'itemImagesRootPath') {
+      return '$_b64Prefix${base64Encode(utf8.encode(value))}';
+    }
+    return value;
+  }
+
+  String _decodeSettingValue(String key, Object? rawValue) {
+    final value = (rawValue ?? '').toString();
+    if (key == 'itemImagesRootPath' && value.startsWith(_b64Prefix)) {
+      try {
+        return utf8.decode(base64Decode(value.substring(_b64Prefix.length)));
+      } catch (_) {
+        return '';
+      }
+    }
+    return value;
+  }
 
   Future<AppSettings> loadSettings() async {
     final result = await _db.query(
@@ -18,38 +43,30 @@ class SettingsRepository {
     final settings = <String, dynamic>{};
     for (final row in result) {
       final key = (row['key'] ?? '').toString();
-      final value = row['value'];
+      final value = _decodeSettingValue(key, row['value']);
 
       if (key == 'itemCategories' ||
           key == 'itemBrands' ||
           key == 'billingPaymentModes') {
-        if (value is String) {
-          try {
-            settings[key] = value
-                .split(',')
-                .map((s) => s.trim())
-                .where((s) => s.isNotEmpty)
-                .toList();
-          } catch (_) {
-            settings[key] = [];
-          }
-        } else if (value is List) {
-          settings[key] = value;
-        } else {
+        try {
+          settings[key] = value
+              .split(',')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
+        } catch (_) {
           settings[key] = [];
         }
       } else if (key == 'itemsWholesaleAutoApply') {
-        if (value is bool) {
-          settings[key] = value;
+        final str = value.trim().toLowerCase();
+        if (str == 'true' || str == '1') {
+          settings[key] = true;
+        } else if (str == 'false' || str == '0') {
+          settings[key] = false;
+        } else if (str.isEmpty) {
+          settings[key] = false;
         } else {
-          final str = (value ?? '').toString().trim().toLowerCase();
-          if (str == 'true' || str == '1') {
-            settings[key] = true;
-          } else if (str == 'false' || str == '0') {
-            settings[key] = false;
-          } else {
-            settings[key] = value;
-          }
+          settings[key] = value;
         }
       } else {
         settings[key] = value;
@@ -64,8 +81,9 @@ class SettingsRepository {
       final value = entry.value is List
           ? (entry.value as List).join(',')
           : '${entry.value}';
-      final escapedKey = entry.key.replaceAll("'", "''");
-      final escapedValue = value.replaceAll("'", "''");
+      final escapedKey = _sqlEscape(entry.key);
+      final storedValue = _encodeSettingValue(entry.key, value);
+      final escapedValue = _sqlEscape(storedValue);
 
       await _db.execute(
         "INSERT INTO app_settings (`key`, `value`) VALUES ('$escapedKey', '$escapedValue') "

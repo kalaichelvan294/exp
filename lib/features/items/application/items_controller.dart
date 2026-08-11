@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/images/item_image_path.dart';
 import '../data/items_repository.dart';
 import '../domain/item_form.dart';
 import 'items_state.dart';
@@ -176,8 +174,6 @@ class ItemsController extends Notifier<ItemsState> {
   Future<bool> saveItem(
     ItemFormData form, {
     String editingItemId = '',
-    String selectedImagePath = '',
-    String itemImagesRootPath = '',
   }) async {
     final clientError = form.validate();
     if (clientError != null) {
@@ -199,16 +195,6 @@ class ItemsController extends Notifier<ItemsState> {
           isError: true,
         ),
       );
-      return false;
-    }
-
-    final imageOk = await _persistSelectedImage(
-      sku: ItemFormData.normalizeSku(form.sku),
-      selectedImagePath: selectedImagePath,
-      configuredRootPath: itemImagesRootPath,
-    );
-    if (!imageOk) {
-      state = state.copyWith(submitting: false);
       return false;
     }
 
@@ -240,90 +226,6 @@ class ItemsController extends Notifier<ItemsState> {
     }
   }
 
-  Future<bool> savePickedImage({
-    required String sku,
-    required String selectedImagePath,
-    required String itemImagesRootPath,
-  }) {
-    return _persistSelectedImage(
-      sku: ItemFormData.normalizeSku(sku),
-      selectedImagePath: selectedImagePath,
-      configuredRootPath: itemImagesRootPath,
-    );
-  }
-
-  Future<bool> _persistSelectedImage({
-    required String sku,
-    required String selectedImagePath,
-    required String configuredRootPath,
-  }) async {
-    final sourcePath = selectedImagePath.trim();
-    if (sourcePath.isEmpty) return true;
-    final lowerSource = sourcePath.toLowerCase();
-    if (!(lowerSource.endsWith('.jpg') || lowerSource.endsWith('.jpeg'))) {
-      state = state.copyWith(
-        message: const ItemsMessage(
-          'Only JPG images are allowed.',
-          isError: true,
-        ),
-      );
-      return false;
-    }
-
-    final storageRoot = ItemImagePath.resolveStorageDirectory(
-      configuredRootPath,
-    );
-    if (storageRoot == null || storageRoot.trim().isEmpty) {
-      state = state.copyWith(
-        message: const ItemsMessage(
-          'Configure Item Images Root Path in Settings before saving images.',
-          isError: true,
-        ),
-      );
-      return false;
-    }
-
-    try {
-      final source = File(sourcePath);
-      if (!await source.exists()) {
-        state = state.copyWith(
-          message: const ItemsMessage(
-            'Selected image file was not found.',
-            isError: true,
-          ),
-        );
-        return false;
-      }
-      final fileName = ItemImagePath.fileNameForSku(sku);
-      final destinationPath = ItemImagePath.resolve(
-        sku: sku,
-        configuredRootPath: storageRoot,
-        fallbackHost: 'localhost',
-      ).filePath;
-      if (destinationPath == null || destinationPath.trim().isEmpty) {
-        state = state.copyWith(
-          message: const ItemsMessage(
-            'Invalid Item Images Root Path.',
-            isError: true,
-          ),
-        );
-        return false;
-      }
-      final destination = File(destinationPath);
-      await destination.parent.create(recursive: true);
-      await source.copy(destination.path);
-      state = state.copyWith(message: ItemsMessage('Saved image as $fileName'));
-      return true;
-    } catch (e) {
-      state = state.copyWith(
-        message: ItemsMessage(
-          'Failed to save item image: ${e.toString()}',
-          isError: true,
-        ),
-      );
-      return false;
-    }
-  }
 }
 
 final itemsControllerProvider = NotifierProvider<ItemsController, ItemsState>(

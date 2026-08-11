@@ -576,7 +576,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         const SizedBox(height: AppSpacing.x6),
         Text(
-          'Training images use <SKU>_master plus _1 through _5 in JPG, JPEG, or PNG format.',
+          'Training images use <SKU>_MASTER plus _1 through _5 in JPG, JPEG, or PNG format.',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.neutral500),

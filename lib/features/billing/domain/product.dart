@@ -44,7 +44,7 @@ class Product {
   /// exists, otherwise just the English name.
   String get displayName => nameTa.isNotEmpty ? '$nameTa / $name' : name;
 
-  String get imageFileName => '${sku.trim()}_master.jpg';
+  String get imageFileName => '${sku.trim()}_MASTER.jpg';
 
   Iterable<String> get trainingImageFileNames =>
       ItemImagePath.trainingFileNamesForSku(sku);
@@ -92,7 +92,7 @@ class Product {
       sku: (json['sku'] ?? json['id'] ?? '').toString(),
       barcode: (json['barcode'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
-      nameTa: (json['nameTa'] ?? '').toString(),
+      nameTa: (json['nameTa'] ?? json['name_ta'] ?? '').toString(),
       brandName: brand.toString(),
       category: (json['category'] ?? 'UNCATEGORIZED').toString(),
       pricingType: PricingType.fromWire(pricingWire),

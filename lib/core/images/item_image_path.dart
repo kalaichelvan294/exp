@@ -13,7 +13,7 @@ class ItemImageLocation {
 class ItemImagePath {
   ItemImagePath._();
 
-  static String fileNameForSku(String sku) => '${sku.trim()}_master.jpg';
+  static String fileNameForSku(String sku) => '${sku.trim()}_MASTER.jpg';
 
   static String trainingFileNameForSku(
     String sku,

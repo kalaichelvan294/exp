@@ -6,6 +6,7 @@ import '../../image_search/data/product_embedding_repository.dart';
 import '../data/settings_repository.dart';
 import '../domain/app_settings.dart';
 import 'settings_state.dart';
+import 'package:flutter/foundation.dart';
 
 /// Settings controller. Ports settings.js: loads all settings, saves each
 /// section independently (with parity validation), and manages the editable
@@ -353,6 +354,7 @@ class SettingsController extends Notifier<SettingsState> {
 
   Future<void> refreshImageEmbeddings() async {
     final rootPath = state.settings.itemImagesRootPath.trim();
+    debugPrint('[EmbeddingRefresh] Triggered from settings. rootPath="$rootPath"');
     if (rootPath.isEmpty) {
       return _err('Item images root path is required before refreshing embeddings.');
     }
@@ -364,10 +366,17 @@ class SettingsController extends Notifier<SettingsState> {
             imagesRootPath: rootPath,
             cleanupTrainingImages: state.cleanupTrainingImagesAfterEmbedding,
           );
+      debugPrint(
+        '[EmbeddingRefresh] Completed. productsIndexed=${result.productsIndexed}, '
+        'imagesIndexed=${result.imagesIndexed}, productsSkipped=${result.productsSkipped}, '
+        'barcodeUpdates=${result.barcodeUpdates}',
+      );
       _ok(
-        'Indexed ${result.productsIndexed} product(s) and ${result.imagesIndexed} image(s).',
+        'Indexed ${result.productsIndexed} product(s), ${result.imagesIndexed} image(s), '
+        'skipped ${result.productsSkipped} product(s), barcode updates ${result.barcodeUpdates}.',
       );
     } catch (e) {
+      debugPrint('[EmbeddingRefresh] Failed: $e');
       _err('Failed to refresh embeddings: ${e.toString()}');
     }
   }

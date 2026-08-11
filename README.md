@@ -39,13 +39,13 @@ Flutter **Windows desktop** POS app (`pos-294`).
   - If barcode found and differs from product barcode, updates product automatically.
 - **Embedding refresh and cleanup controls** in Settings > Item Configuration.
   - Click "Refresh embeddings" to rebuild the product embedding index from training images.
-  - Toggle "Clean up training images after embedding" to auto-delete variant images (_1 through _5) after indexing; master (_master) is always kept.
+  - Toggle "Clean up training images after embedding" to auto-delete variant images (_1 through _5) after indexing; master (_MASTER) is always kept.
 - Sales Desk search dropdown is now **image-card only** in a **3-column keyboard-navigable grid**.
 - Sales Desk add flow: Enter adds selected item, focus moves to qty/wt, next Enter confirms and returns focus to search.
 - Search cards now show item image, Tamil/English names, price per qty/kg, stock tag, and brand.
 - Reports page and route were removed.
 - Items add/edit modal redesigned with image-first layout and grouped fields.
-- Item image handling supports JPG/JPEG/PNG, saved with training format (`<SKU>_master`, `<SKU>_1` through `<SKU>_5`) to configurable root path from Settings.
+- Item image handling supports JPG/JPEG/PNG, saved with training format (`<SKU>_MASTER`, `<SKU>_1` through `<SKU>_5`) to configurable root path from Settings.
 - Item images in Sales Desk and Items page now resolve using Settings image root path.
 - Brand display with fallback is shown in Sales Desk search cards and Items cards.
 - Reusable UI blocks were refactored into `lib/shared/widgets` (common `AppCard` and `SectionCard`).
@@ -150,13 +150,13 @@ Each feature follows clean architecture:
   - Wholesale auto-apply toggle
   - Item Images Root Path configuration
   - **Refresh embeddings** button to rebuild product image embeddings from training images
-    - Scans all products for training image files (format: `<SKU>_master.<ext>`, `<SKU>_1.<ext>` through `<SKU>_5.<ext>`)
+    - Scans all products for training image files (format: `<SKU>_MASTER.<ext>`, `<SKU>_1.<ext>` through `<SKU>_5.<ext>`)
     - Only indexes products with master + at least one variant image
     - Computes 112x112 ONNX embeddings locally (Windows only)
     - Auto-extracts barcode from master image using Yomu decoder; updates product barcode if found and different
   - **Clean up training images after embedding** toggle
     - Auto-deletes variant images (_1 through _5) after successful embedding refresh
-    - Master image (_master) is always retained for future searches
+    - Master image (_MASTER) is always retained for future searches
 - Toast-based success and error messages
 
 ### Authentication / Printing
@@ -179,7 +179,7 @@ Product images are organized in a configurable file root (set in Settings > Item
 
 ```
 <ImageRoot>/
-  <SKU>_master.jpg        Master image (required for indexing)
+  <SKU>_MASTER.jpg        Master image (required for indexing)
   <SKU>_1.jpg             Variant 1 (optional, used for training)
   <SKU>_2.jpg             Variant 2 (optional, used for training)
   ...
@@ -188,7 +188,7 @@ Product images are organized in a configurable file root (set in Settings > Item
 
 **Supported formats**: JPG, JPEG, PNG
 
-**Master image naming**: `<SKU>_master.<ext>` is the authoritative product image and barcode source. Master images are never deleted during cleanup.
+**Master image naming**: `<SKU>_MASTER.<ext>` is the authoritative product image and barcode source. Master images are never deleted during cleanup.
 
 **Variant images**: `<SKU>_1.<ext>` through `<SKU>_5.<ext>` are alternate angles or lighting. Used only for embedding indexing. Can be auto-deleted by enabling "Clean up training images after embedding" in Settings.
 

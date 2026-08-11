@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:yomu/yomu.dart';
@@ -59,6 +59,10 @@ class ProductEmbeddingRepository {
 
   List<_StoredEmbedding>? _cache;
   Map<String, Product>? _productCache;
+
+  void _log(String message) {
+    debugPrint('[EmbeddingRefresh] $message');
+  }
 
   String _sqlString(String value) => "'${value.replaceAll("'", "''")}'";
 
@@ -127,18 +131,24 @@ class ProductEmbeddingRepository {
     required String imagesRootPath,
     required bool cleanupTrainingImages,
   }) async {
+    _log('Starting rebuild. imagesRootPath="$imagesRootPath", cleanupTrainingImages=$cleanupTrainingImages');
     final storageRoot = ItemImagePath.resolveStorageDirectory(imagesRootPath);
     if (storageRoot == null || storageRoot.trim().isEmpty) {
+      _log('Resolved storage root is invalid/null from imagesRootPath="$imagesRootPath".');
       throw StateError('Item images root path must point to a local folder.');
     }
+    _log('Resolved storage root="$storageRoot".');
     final root = Directory(storageRoot);
     if (!await root.exists()) {
+      _log('Storage root folder does not exist: "$storageRoot".');
       throw StateError('Item images root folder does not exist.');
     }
+    _log('Storage root exists: "$storageRoot".');
 
     final products = await _db.query(
       'SELECT * FROM products ORDER BY id',
     );
+    _log('Loaded ${products.length} product(s) from database.');
     var productsIndexed = 0;
     var imagesIndexed = 0;
     var barcodeUpdates = 0;
@@ -146,61 +156,87 @@ class ProductEmbeddingRepository {
 
     for (final row in products) {
       final product = Product.fromJson(row);
-      final files = await _collectTrainingImages(root, product.sku);
-      if (files == null) {
-        productsSkipped++;
-        continue;
-      }
+      try {
+        final files = await _collectTrainingImages(root, product.sku);
+        if (files == null) {
+          productsSkipped++;
+          _log('SKIP sku="${product.sku}" id="${product.id}" reason=no_master_image_found');
+          continue;
+        }
+        _log(
+          'PROCESS sku="${product.sku}" id="${product.id}" files=${files.length} '
+          '(${files.map((f) => f.path.split(RegExp(r"[\\\\/]")).last).join(", ")})',
+        );
 
-      final embeddings = <Map<String, Object?>>[];
-      String? detectedBarcode;
-      for (final file in files) {
-        final bytes = await file.readAsBytes();
-        final vector = await _vision.embedImage(bytes);
-        embeddings.add({
-          'image_url': file.uri.pathSegments.isNotEmpty
-              ? file.uri.pathSegments.last
-              : file.path,
-          'embedding': vector,
-        });
-        detectedBarcode ??= _decodeBarcode(bytes);
-      }
+        final embeddings = <Map<String, Object?>>[];
+        String? detectedBarcode;
+        for (final file in files) {
+          final bytes = await file.readAsBytes();
+          final vector = await _vision.embedImage(bytes);
+          embeddings.add({
+            'image_url': file.uri.pathSegments.isNotEmpty
+                ? file.uri.pathSegments.last
+                : file.path,
+            'embedding': vector,
+          });
+          detectedBarcode ??= _decodeBarcode(bytes);
+          _log(
+            'Embedded file="${file.path}" vectorSize=${vector.length} '
+            'barcodeDetected=${detectedBarcode != null && detectedBarcode.trim().isNotEmpty}',
+          );
+        }
 
-      if (embeddings.isEmpty) {
-        productsSkipped++;
-        continue;
-      }
+        if (embeddings.isEmpty) {
+          productsSkipped++;
+          _log('SKIP sku="${product.sku}" id="${product.id}" reason=no_embeddings_generated');
+          continue;
+        }
 
-      final escapedId = product.id.replaceAll("'", "''");
-      await _db.execute(
-        "DELETE FROM product_embeddings WHERE product_id = '$escapedId'",
-      );
-      for (final embedding in embeddings) {
-        final imageUrl = (embedding['image_url'] ?? '').toString();
-        final vector = embedding['embedding'] as List<double>;
+        final escapedId = product.id.replaceAll("'", "''");
         await _db.execute(
-          "INSERT INTO product_embeddings (product_id, image_url, embedding) VALUES (${_sqlString(product.id)}, ${_sqlString(imageUrl)}, ${_sqlString(jsonEncode(vector))})",
+          "DELETE FROM product_embeddings WHERE product_id = '$escapedId'",
+        );
+        for (final embedding in embeddings) {
+          final imageUrl = (embedding['image_url'] ?? '').toString();
+          final vector = embedding['embedding'] as List<double>;
+          await _db.execute(
+            "INSERT INTO product_embeddings (product_id, image_url, embedding) VALUES (${_sqlString(product.id)}, ${_sqlString(imageUrl)}, ${_sqlString(jsonEncode(vector))})",
+          );
+        }
+
+        if (cleanupTrainingImages) {
+          await _deleteTrainingVariants(root, product.sku);
+          _log('Cleanup enabled: deleted variant images for sku="${product.sku}".');
+        }
+
+        if (detectedBarcode != null &&
+            detectedBarcode.trim().isNotEmpty &&
+            detectedBarcode.trim() != product.barcode.trim()) {
+          await _db.execute(
+            "UPDATE products SET barcode = ${_sqlString(detectedBarcode.trim())} WHERE id = ${_sqlString(product.id)}",
+          );
+          barcodeUpdates++;
+          _log(
+            'Barcode updated for sku="${product.sku}" id="${product.id}" '
+            'old="${product.barcode}" new="${detectedBarcode.trim()}".',
+          );
+        }
+
+        productsIndexed++;
+        imagesIndexed += embeddings.length;
+      } catch (e, st) {
+        productsSkipped++;
+        _log(
+          'ERROR sku="${product.sku}" id="${product.id}" error="$e"\n$st',
         );
       }
-
-      if (cleanupTrainingImages) {
-        await _deleteTrainingVariants(root, product.sku);
-      }
-
-      if (detectedBarcode != null &&
-          detectedBarcode.trim().isNotEmpty &&
-          detectedBarcode.trim() != product.barcode.trim()) {
-        await _db.execute(
-          "UPDATE products SET barcode = ${_sqlString(detectedBarcode.trim())} WHERE id = ${_sqlString(product.id)}",
-        );
-        barcodeUpdates++;
-      }
-
-      productsIndexed++;
-      imagesIndexed += embeddings.length;
     }
 
     _invalidateCache();
+    _log(
+      'Rebuild complete. productsIndexed=$productsIndexed imagesIndexed=$imagesIndexed '
+      'productsSkipped=$productsSkipped barcodeUpdates=$barcodeUpdates',
+    );
     return EmbeddingRefreshSummary(
       productsIndexed: productsIndexed,
       imagesIndexed: imagesIndexed,
@@ -274,9 +310,7 @@ class ProductEmbeddingRepository {
       }
     }
 
-    if (variants.length < 2) {
-      return null;
-    }
+    // Allow indexing with master image only.
     return variants;
   }
 

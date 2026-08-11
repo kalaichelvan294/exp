@@ -40,8 +40,6 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
   String _brand = '';
   PricingType _pricingType = PricingType.unit;
   String _selectedImagePath = '';
-  String _persistedImageSku = '';
-  String _persistedImagePath = '';
 
   ItemsController get _c => ref.read(itemsControllerProvider.notifier);
 
@@ -125,10 +123,6 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
         selection: TextSelection.collapsed(offset: normalized.length),
       );
     }
-    if (_persistedImageSku.isNotEmpty && _persistedImageSku != normalized) {
-      _persistedImageSku = '';
-      _persistedImagePath = '';
-    }
     _c.scheduleSkuValidation(normalized, excludeItemId: _editingId);
     setState(() {});
   }
@@ -155,44 +149,12 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
       return;
     }
     setState(() => _selectedImagePath = path);
-
-    final sku = ItemFormData.normalizeSku(_sku.text);
-    if (sku.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Image selected. Set SKU to save it as <SKU>_master.jpg.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    final settings = ref.read(settingsControllerProvider).settings;
-    final ok = await _c.savePickedImage(
-      sku: sku,
-      selectedImagePath: path,
-      itemImagesRootPath: settings.itemImagesRootPath,
-    );
-    if (ok) {
-      _persistedImageSku = sku;
-      _persistedImagePath = path;
-    }
   }
 
   Future<void> _submit() async {
-    final settings = ref.read(settingsControllerProvider).settings;
-    final sku = ItemFormData.normalizeSku(_sku.text);
-    final shouldSkipImageCopy =
-        _selectedImagePath.trim().isNotEmpty &&
-        _persistedImagePath == _selectedImagePath &&
-        _persistedImageSku == sku;
     final ok = await _c.saveItem(
       _formData(),
       editingItemId: _editingId,
-      selectedImagePath: shouldSkipImageCopy ? '' : _selectedImagePath,
-      itemImagesRootPath: settings.itemImagesRootPath,
     );
     if (ok && mounted) Navigator.of(context).pop(true);
   }
@@ -293,17 +255,20 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 180,
-            child: ClipRRect(
-              borderRadius: AppRadius.input,
-              child: _selectedImagePath.trim().isNotEmpty
-                  ? Image.file(
-                      File(_selectedImagePath),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, error, stackTrace) => _missingImage(),
-                    )
-                  : _imageWidget(image),
+          Center(
+            child: SizedBox(
+              width: 180,
+              height: 180,
+              child: ClipRRect(
+                borderRadius: AppRadius.input,
+                child: _selectedImagePath.trim().isNotEmpty
+                    ? Image.file(
+                        File(_selectedImagePath),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, error, stackTrace) => _missingImage(),
+                      )
+                    : _imageWidget(image),
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.x8),

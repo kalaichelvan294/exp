@@ -61,8 +61,14 @@ class ItemFormData {
   static String normalizeSku(String value) =>
       value.toUpperCase().replaceAll(RegExp(r'\s+'), '').trim();
 
-  bool get _hasWholesalePrice => wholesalePriceInput.trim().isNotEmpty;
-  bool get _hasWholesaleMinQty => wholesaleMinQtyInput.trim().isNotEmpty;
+  int get _wholesalePaise =>
+      Money.parseInrToPaise(wholesalePriceInput.trim().isEmpty ? '0' : wholesalePriceInput);
+
+  num get _wholesaleMinQty =>
+      num.tryParse(wholesaleMinQtyInput.trim().isEmpty ? '0' : wholesaleMinQtyInput.trim()) ?? 0;
+
+  bool get _hasWholesalePrice => _wholesalePaise > 0;
+  bool get _hasWholesaleMinQty => _wholesaleMinQty > 0;
 
   /// Returns the first validation error, or null when the form is valid.
   /// Does not perform server SKU uniqueness (handled separately).
@@ -83,11 +89,7 @@ class ItemFormData {
       return 'Wholesale price and minimum qty must both be provided.';
     }
     if (_hasWholesalePrice) {
-      final wholesalePaise = Money.parseInrToPaise(wholesalePriceInput);
-      if (wholesalePaise <= 0) {
-        return 'Wholesale price must be greater than 0.';
-      }
-      final minQty = num.tryParse(wholesaleMinQtyInput.trim()) ?? 0;
+      final minQty = _wholesaleMinQty;
       if (minQty <= 0) {
         return 'Wholesale minimum qty must be greater than 0.';
       }
@@ -101,11 +103,9 @@ class ItemFormData {
   /// Builds the `items:create` / `items:update` payload (prices in paise).
   Map<String, dynamic> toPayload() {
     final retailPaise = Money.parseInrToPaise(retailPriceInput);
-    final wholesalePaise = _hasWholesalePrice
-        ? Money.parseInrToPaise(wholesalePriceInput)
-        : null;
-    final wholesaleMinQty = _hasWholesaleMinQty
-        ? num.tryParse(wholesaleMinQtyInput.trim())
+    final wholesalePaise = _hasWholesalePrice ? _wholesalePaise : null;
+    final wholesaleMinQty = _hasWholesalePrice && _hasWholesaleMinQty
+        ? _wholesaleMinQty
         : null;
 
     return {
