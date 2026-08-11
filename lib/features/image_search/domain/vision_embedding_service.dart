@@ -51,8 +51,9 @@ class VisionEmbeddingService {
     _outputName = _session!.outputNames.first;
   }
 
-  Future<List<double>> embedImage(Uint8List bytes) async {
+  Future<List<double>> embedImage(Uint8List bytes, {int? inputSize}) async {
     await _ensureLoaded();
+    final size = inputSize ?? _inputSize;
     final decoded = img.decodeImage(bytes);
     if (decoded == null) {
       throw StateError('Unsupported image format.');
@@ -60,20 +61,20 @@ class VisionEmbeddingService {
 
     final resized = img.copyResize(
       decoded,
-      width: _inputSize,
-      height: _inputSize,
+      width: size,
+      height: size,
       interpolation: img.Interpolation.cubic,
     );
     final rgba = resized.getBytes(order: img.ChannelOrder.rgba);
-    final area = _inputSize * _inputSize;
+    final area = size * size;
     final data = Float32List(area * 3);
     const mean = 127.5;
     const scale = 1.0 / 128.0;
 
-    for (var y = 0; y < _inputSize; y++) {
-      for (var x = 0; x < _inputSize; x++) {
-        final pixelIndex = (y * _inputSize + x) * 4;
-        final base = y * _inputSize + x;
+    for (var y = 0; y < size; y++) {
+      for (var x = 0; x < size; x++) {
+        final pixelIndex = (y * size + x) * 4;
+        final base = y * size + x;
         final r = rgba[pixelIndex].toDouble();
         final g = rgba[pixelIndex + 1].toDouble();
         final b = rgba[pixelIndex + 2].toDouble();
@@ -88,7 +89,7 @@ class VisionEmbeddingService {
     final outputName = _outputName!;
     final input = OrtValueTensor.createTensorWithDataList(
       [data],
-      [1, 3, _inputSize, _inputSize],
+      [1, 3, size, size],
     );
     final runOptions = OrtRunOptions();
     OrtValueTensor? output;

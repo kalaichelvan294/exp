@@ -31,6 +31,11 @@ class BillingController extends Notifier<BillingState> {
   Timer? _searchDebounce0;
   int _searchToken = 0;
   CameraController? _cameraController;
+  Timer? _cameraFrameProcessingDebounce;
+  DateTime _lastProcessedFrameTime = DateTime(2000);
+  int _frameSkipCounter = 0;
+  static const _frameSkipCount = 2; // Process every 3rd frame (skip 2)
+  static const _minFrameProcessingInterval = Duration(milliseconds: 500);
 
   BillingRepository get _repo => ref.read(billingRepositoryProvider);
 
@@ -38,6 +43,7 @@ class BillingController extends Notifier<BillingState> {
   BillingState build() {
     ref.onDispose(() {
       _searchDebounce0?.cancel();
+      _cameraFrameProcessingDebounce?.cancel();
       final controller = _cameraController;
       _cameraController = null;
       if (controller != null) {
@@ -48,7 +54,10 @@ class BillingController extends Notifier<BillingState> {
     Future.microtask(() async {
       await loadHeldBills();
       await loadRecentBills();
-      // DO NOT initialize camera here - only on demand
+      // Initialize camera on page load (keep alive for entire session)
+      if (Platform.isWindows) {
+        await ensureCameraReady();
+      }
     });
     return const BillingState();
   }
@@ -59,6 +68,16 @@ class BillingController extends Notifier<BillingState> {
   // ── Search ────────────────────────────────────────────────────────────
 
   bool _shouldRunSearch(String query) => query.trim().isNotEmpty;
+
+  void onSearchFocusChanged(bool focused) {
+    state = state.copyWith(searchFieldFocused: focused);
+    if (!focused) {
+      // Cancel pending camera frame processing when focus is lost
+      _cameraFrameProcessingDebounce?.cancel();
+      _cameraFrameProcessingDebounce = null;
+      _frameSkipCounter = 0;
+    }
+  }
 
   void onQueryChanged(String query) {
     state = state.copyWith(query: query, searchDropdownOpen: true);
@@ -345,6 +364,116 @@ class BillingController extends Notifier<BillingState> {
     }
   }
 
+  /// Continuous optimized camera processing:
+  /// - Only processes when search field has focus
+  /// - Skips 2 frames (processes every 3rd frame)
+  /// - Limits frame processing to 500ms intervals
+  /// - 100ms debounce before processing
+  /// - Locks to prevent parallel searches
+  /// For low-end systems: reduces CPU/memory usage significantly
+  Future<void> processCameraFrameOptimized() async {
+    // Check preconditions for processing
+    if (state.cameraTurnedOff || state.cameraProcessing || !state.searchFieldFocused) {
+      return;
+    }
+
+    // Frame skipping: skip 2 frames, process every 3rd
+    _frameSkipCounter = (_frameSkipCounter + 1) % (_frameSkipCount + 1);
+    if (_frameSkipCounter != 0) {
+      return; // Skip this frame
+    }
+
+    // Rate limiting: 500ms minimum between frame captures
+    final now = DateTime.now();
+    if (now.difference(_lastProcessedFrameTime) < _minFrameProcessingInterval) {
+      return; // Too soon, skip
+    }
+
+    // Cancel any pending debounce and set new one
+    _cameraFrameProcessingDebounce?.cancel();
+    _cameraFrameProcessingDebounce = Timer(_searchDebounce, () async {
+      // Double-check conditions after debounce
+      if (state.cameraTurnedOff || state.cameraProcessing || !state.searchFieldFocused) {
+        return;
+      }
+
+      state = state.copyWith(cameraProcessing: true, cameraBusy: true);
+      _lastProcessedFrameTime = DateTime.now();
+
+      try {
+        final controller = _cameraController;
+        if (controller == null || !controller.value.isInitialized) {
+          state = state.copyWith(cameraProcessing: false, cameraBusy: false);
+          return;
+        }
+
+        final capture = await controller.takePicture();
+        final embeddingRepo = ref.read(productEmbeddingRepositoryProvider);
+        
+        // Try barcode first (100% exact match)
+        final barcode = await embeddingRepo.decodeBarcodeFromImageFile(
+          File(capture.path),
+        );
+        final normalizedBarcode = barcode?.trim() ?? '';
+        final barcodeMatch = normalizedBarcode.isEmpty
+            ? null
+            : await _repo.findExactProduct(normalizedBarcode);
+
+        if (barcodeMatch != null) {
+          // Barcode found - instant result
+          state = state.copyWith(
+            query: '',
+            matches: [barcodeMatch],
+            selectedMatchIndex: 0,
+            searchDropdownOpen: true,
+            cameraBusy: false,
+            cameraProcessing: false,
+            cameraStatus: 'Barcode match: ${barcodeMatch.displayName}',
+            message: BillingMessage('Barcode match: ${barcodeMatch.displayName}'),
+          );
+          return;
+        }
+
+        // Fallback to embedding-based search
+        final match = await embeddingRepo.findBestMatchFromImageFile(
+          File(capture.path),
+          // Use reduced resolution for low-end systems: 80x80 instead of 112x112
+          inputSize: 80,
+        );
+
+        if (match == null) {
+          state = state.copyWith(
+            cameraBusy: false,
+            cameraProcessing: false,
+            cameraStatus: 'No match found',
+          );
+          return;
+        }
+
+        state = state.copyWith(
+          query: '',
+          matches: [match.product],
+          selectedMatchIndex: 0,
+          searchDropdownOpen: true,
+          cameraBusy: false,
+          cameraProcessing: false,
+          cameraStatus: 'Match: ${match.product.displayName}',
+          message: BillingMessage(
+            'Camera match: ${match.product.displayName} '
+            '(${(match.similarity * 100).toStringAsFixed(1)}%)',
+          ),
+        );
+      } catch (e) {
+        state = state.copyWith(
+          cameraBusy: false,
+          cameraProcessing: false,
+          cameraError: e.toString(),
+          cameraStatus: 'Processing failed',
+        );
+      }
+    });
+  }
+
   /// Triggered by "/" key - instantly starts camera search if camera is not turned off.
   Future<void> toggleCameraMode() async {
     if (state.cameraTurnedOff) {
@@ -354,22 +483,22 @@ class BillingController extends Notifier<BillingState> {
     await captureCameraSearch();
   }
 
-  /// Opens the camera control modal - initializes camera for preview.
+  /// Opens the camera control modal - camera already alive, just switch to preview mode
   Future<void> openCameraModal() async {
-    if (!state.cameraTurnedOff) {
-      // Initialize camera for live preview in modal
-      await _initCameraForMode(CameraCaptureMode.preview);
+    // Camera is already initialized and alive, just ensure it's ready
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      await ensureCameraReady();
     }
-    state = state.copyWith(cameraModalVisible: true);
+    state = state.copyWith(cameraModalVisible: true, cameraCaptureMode: CameraCaptureMode.preview);
   }
 
-  /// Closes the camera control modal - disposes camera.
+  /// Closes the camera control modal - keeps camera alive
   void closeCameraModal() {
     state = state.copyWith(
       cameraModalVisible: false,
       cameraCaptureMode: CameraCaptureMode.none,
     );
-    _disposeCameraIfNeeded();
+    // Do NOT dispose camera - keep it alive for entire Sales Desk session
   }
 
   /// Toggles camera off/on via the modal. When turned off, "/" key won't work.

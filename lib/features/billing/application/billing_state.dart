@@ -57,6 +57,8 @@ class BillingState {
     this.cameraStatus = 'Camera unavailable',
     this.cameraModalVisible = false,
     this.cameraCaptureMode = CameraCaptureMode.none,
+    this.searchFieldFocused = false,
+    this.cameraProcessing = false,
     this.cart = const [],
     this.selectedCartIndex = -1,
     this.qtyFocusRequestToken = 0,
@@ -88,6 +90,8 @@ class BillingState {
   final String cameraStatus;
   final bool cameraModalVisible;
   final CameraCaptureMode cameraCaptureMode;
+  final bool searchFieldFocused;
+  final bool cameraProcessing;
 
   final List<CartLine> cart;
   final int selectedCartIndex;
@@ -143,6 +147,8 @@ class BillingState {
     String? cameraStatus,
     bool? cameraModalVisible,
     CameraCaptureMode? cameraCaptureMode,
+    bool? searchFieldFocused,
+    bool? cameraProcessing,
     List<CartLine>? cart,
     int? selectedCartIndex,
     int? qtyFocusRequestToken,
@@ -174,6 +180,8 @@ class BillingState {
       cameraStatus: cameraStatus ?? this.cameraStatus,
       cameraModalVisible: cameraModalVisible ?? this.cameraModalVisible,
       cameraCaptureMode: cameraCaptureMode ?? this.cameraCaptureMode,
+      searchFieldFocused: searchFieldFocused ?? this.searchFieldFocused,
+      cameraProcessing: cameraProcessing ?? this.cameraProcessing,
       cart: cart ?? this.cart,
       selectedCartIndex: selectedCartIndex ?? this.selectedCartIndex,
       qtyFocusRequestToken: qtyFocusRequestToken ?? this.qtyFocusRequestToken,

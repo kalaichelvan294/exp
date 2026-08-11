@@ -209,9 +209,9 @@ class ProductEmbeddingRepository {
     );
   }
 
-  Future<ImageSearchMatch?> findBestMatchFromImageFile(File file) async {
+  Future<ImageSearchMatch?> findBestMatchFromImageFile(File file, {int? inputSize}) async {
     final bytes = await file.readAsBytes();
-    return findBestMatchFromImageBytes(bytes);
+    return findBestMatchFromImageBytes(bytes, inputSize: inputSize);
   }
 
   Future<String?> decodeBarcodeFromImageFile(File file) async {
@@ -220,9 +220,10 @@ class ProductEmbeddingRepository {
   }
 
   Future<ImageSearchMatch?> findBestMatchFromImageBytes(
-    List<int> bytes,
-  ) async {
-    final queryVector = await _vision.embedImage(Uint8List.fromList(bytes));
+    List<int> bytes, {
+    int? inputSize,
+  }) async {
+    final queryVector = await _vision.embedImage(Uint8List.fromList(bytes), inputSize: inputSize);
     final embeddings = await _loadEmbeddings();
     if (embeddings.isEmpty) return null;
 

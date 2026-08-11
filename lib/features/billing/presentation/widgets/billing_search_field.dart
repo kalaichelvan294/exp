@@ -185,6 +185,10 @@ class _BillingSearchFieldState extends ConsumerState<BillingSearchField> {
                 ),
               ),
             ),
+            Focus(
+              onFocusChange: (focused) => _c.onSearchFocusChanged(focused),
+              child: const SizedBox(width: 0, height: 0), // Invisible widget for focus tracking
+            ),
             const SizedBox(width: AppSpacing.x8),
             _CameraStatusChip(state: state),
           ],
