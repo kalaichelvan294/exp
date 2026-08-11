@@ -223,173 +223,150 @@ class _ResultsGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = ref.read(billingControllerProvider.notifier);
-    const columns = 3;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final maxWidth = (screenWidth - (AppSpacing.x12 * 2)).clamp(320.0, 1400.0);
+    const imageSize = 72.0;
 
-    return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.x4),
-      constraints: const BoxConstraints(maxHeight: 520),
-      decoration: BoxDecoration(
-        color: AppColors.neutral0,
-        borderRadius: AppRadius.card,
-        border: Border.all(color: AppColors.neutral200),
-        boxShadow: AppShadows.card,
-      ),
-      child: GridView.builder(
-        padding: const EdgeInsets.all(AppSpacing.x12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
-          mainAxisSpacing: AppSpacing.x12,
-          crossAxisSpacing: AppSpacing.x12,
-          childAspectRatio: 0.86,
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Container(
+        margin: const EdgeInsets.only(top: AppSpacing.x4),
+        constraints: const BoxConstraints(maxHeight: 520),
+        decoration: BoxDecoration(
+          color: AppColors.neutral0,
+          borderRadius: AppRadius.card,
+          border: Border.all(color: AppColors.neutral200),
+          boxShadow: AppShadows.card,
         ),
-        itemCount: matches.length,
-        itemBuilder: (context, index) {
-          final product = matches[index];
-          final active = index == selectedIndex;
-          final image = ItemImagePath.resolve(
-            sku: product.sku,
-            configuredRootPath: imageRootPath,
-            fallbackHost: fallbackHost,
-          );
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: AppRadius.input,
-              onTap: () => c.addProduct(product, 'MANUAL_SEARCH'),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: active ? AppColors.neutral50 : AppColors.neutral0,
-                  borderRadius: AppRadius.input,
-                  border: Border.all(
-                    color: active ? AppColors.primary500 : AppColors.neutral300,
-                    width: active ? 2 : 1,
+        child: GridView.builder(
+          padding: const EdgeInsets.all(AppSpacing.x12),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            mainAxisSpacing: AppSpacing.x8,
+            crossAxisSpacing: AppSpacing.x8,
+            childAspectRatio: 0.82,
+          ),
+          itemCount: matches.length,
+          itemBuilder: (context, index) {
+            final product = matches[index];
+            final active = index == selectedIndex;
+            final image = ItemImagePath.resolve(
+              sku: product.sku,
+              configuredRootPath: imageRootPath,
+              fallbackHost: fallbackHost,
+            );
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: AppRadius.input,
+                onTap: () => c.addProduct(product, 'MANUAL_SEARCH'),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.neutral50 : AppColors.neutral0,
+                    borderRadius: AppRadius.input,
+                    border: Border.all(
+                      color: active
+                          ? AppColors.primary500
+                          : AppColors.neutral300,
+                      width: active ? 2 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: AppSpacing.x8),
+                      SizedBox(
+                        width: imageSize,
+                        height: imageSize,
+                        child: ClipRRect(
+                          borderRadius: AppRadius.input,
+                          child: image.filePath != null
+                              ? Image.file(
+                                  File(image.filePath!),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: AppColors.neutral100,
+                                      alignment: Alignment.center,
+                                      child: const Text('No image'),
+                                    );
+                                  },
+                                )
+                              : Image.network(
+                                  image.networkUrl ?? '',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: AppColors.neutral100,
+                                      alignment: Alignment.center,
+                                      child: const Text('No image'),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.x8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.displayName.trim().isNotEmpty
+                                  ? product.displayName
+                                  : (product.sku.trim().isNotEmpty
+                                        ? product.sku
+                                        : 'Unnamed item'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: AppSpacing.x4),
+                            Text(
+                              'SKU: ${product.sku.trim().isNotEmpty ? product.sku : '—'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: AppSpacing.x4),
+                            Text(
+                              'Brand: ${product.brandName.trim().isNotEmpty ? product.brandName : 'Unbranded'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.neutral600),
+                            ),
+                            const SizedBox(height: AppSpacing.x4),
+                            Text(
+                              product.stockDisplay,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.neutral700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const SizedBox(height: AppSpacing.x6),
+                            Text(
+                              '${Money.format(product.ratePaise)} / ${product.pricingType == PricingType.weight ? 'kg' : 'qty'}',
+                              textAlign: TextAlign.right,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: AppColors.primary600,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Column(
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(8),
-                                topRight: Radius.circular(8),
-                              ),
-                              child: image.filePath != null
-                                  ? Image.file(
-                                      File(image.filePath!),
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return Container(
-                                              color: AppColors.neutral100,
-                                              alignment: Alignment.center,
-                                              child: const Text('No image'),
-                                            );
-                                          },
-                                    )
-                                  : Image.network(
-                                      image.networkUrl ?? '',
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return Container(
-                                              color: AppColors.neutral100,
-                                              alignment: Alignment.center,
-                                              child: const Text('No image'),
-                                            );
-                                          },
-                                    ),
-                            ),
-                          ),
-                          Positioned(
-                            top: AppSpacing.x8,
-                            left: AppSpacing.x8,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: AppColors.neutral900.withValues(
-                                  alpha: 0.78,
-                                ),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.x8,
-                                  vertical: AppSpacing.x4,
-                                ),
-                                child: Text(
-                                  product.stockDisplay,
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: AppColors.neutral0,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.x6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.displayName.trim().isNotEmpty
-                                      ? product.displayName
-                                      : (product.sku.trim().isNotEmpty
-                                            ? product.sku
-                                            : 'Unnamed item'),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: AppSpacing.x4),
-                                Text(
-                                  'SKU: ${product.sku.trim().isNotEmpty ? product.sku : '—'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: AppSpacing.x4),
-                                Text(
-                                  'Brand: ${product.brandName.trim().isNotEmpty ? product.brandName : 'Unbranded'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: AppColors.neutral600),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.x8),
-                          Text(
-                            '${Money.format(product.ratePaise)} / ${product.pricingType == PricingType.weight ? 'kg' : 'qty'}',
-                            textAlign: TextAlign.right,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: AppColors.primary600,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -405,10 +382,14 @@ class _SearchHint extends ConsumerWidget {
       text = state.message.text;
     } else if (state.cameraBusy) {
       text = state.cameraStatus;
-    } else if (state.query.isEmpty && state.cameraCaptureMode != CameraCaptureMode.none && !state.cameraTurnedOff) {
-      text = 'Camera active. Press "/" again to search or click the badge to open settings.';
+    } else if (state.query.isEmpty &&
+        state.cameraCaptureMode != CameraCaptureMode.none &&
+        !state.cameraTurnedOff) {
+      text =
+          'Camera active. Press "/" again to search or click the badge to open settings.';
     } else if (state.query.isEmpty) {
-      text = 'Type item name or SKU. Press Enter to add best match. Press "/" for camera search.';
+      text =
+          'Type item name or SKU. Press Enter to add best match. Press "/" for camera search.';
     } else if (state.searching) {
       text = 'Searching…';
     } else if (state.matches.isEmpty) {
@@ -435,13 +416,13 @@ class _CameraStatusChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = ref.read(billingControllerProvider.notifier);
-    
+
     // Determine color and icon based on state
     Color bg;
     Color fg;
     IconData icon;
     String label;
-    
+
     if (state.cameraError.isNotEmpty) {
       // Red for error
       bg = AppColors.error500.withValues(alpha: 0.16);
@@ -460,7 +441,8 @@ class _CameraStatusChip extends ConsumerWidget {
       fg = AppColors.warning500;
       icon = Icons.hourglass_top;
       label = 'Scanning...';
-    } else if (state.cameraConnected && state.cameraCaptureMode != CameraCaptureMode.none) {
+    } else if (state.cameraConnected &&
+        state.cameraCaptureMode != CameraCaptureMode.none) {
       // Green for live (camera is connected and in use)
       bg = AppColors.success500.withValues(alpha: 0.16);
       fg = AppColors.success500;
@@ -475,8 +457,8 @@ class _CameraStatusChip extends ConsumerWidget {
     }
 
     return Tooltip(
-      message: state.cameraError.isNotEmpty 
-          ? state.cameraError 
+      message: state.cameraError.isNotEmpty
+          ? state.cameraError
           : state.cameraStatus,
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
@@ -488,9 +470,10 @@ class _CameraStatusChip extends ConsumerWidget {
             border: Border.all(
               color: state.cameraTurnedOff || state.cameraError.isNotEmpty
                   ? fg
-                  : (state.cameraConnected && state.cameraCaptureMode != CameraCaptureMode.none 
-                      ? AppColors.success500 
-                      : AppColors.neutral300),
+                  : (state.cameraConnected &&
+                            state.cameraCaptureMode != CameraCaptureMode.none
+                        ? AppColors.success500
+                        : AppColors.neutral300),
             ),
           ),
           child: Padding(
