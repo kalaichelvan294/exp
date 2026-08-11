@@ -146,9 +146,13 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       if (cameraModalVisible && !Navigator.of(context, rootNavigator: true).canPop()) {
         showDialog(
           context: context,
+          barrierDismissible: false,
           builder: (ctx) => CameraControlModal(
             state: billingState,
             cameraController: ref.read(billingControllerProvider.notifier).cameraController,
+            onClose: () {
+              Navigator.of(ctx).pop(); // Close dialog first
+            },
           ),
         ).then((_) {
           ref.read(billingControllerProvider.notifier).closeCameraModal();

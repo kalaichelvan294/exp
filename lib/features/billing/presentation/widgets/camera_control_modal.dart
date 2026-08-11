@@ -10,17 +10,29 @@ import '../../application/billing_state.dart';
 
 /// Modal for controlling camera settings and viewing live feed.
 class CameraControlModal extends ConsumerWidget {
-  const CameraControlModal({super.key, required this.state, required this.cameraController});
+  const CameraControlModal({
+    super.key, 
+    required this.state, 
+    required this.cameraController,
+    required this.onClose,
+  });
 
   final BillingState state;
   final CameraController? cameraController;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = ref.read(billingControllerProvider.notifier);
 
-    return Dialog(
-      child: Container(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        onClose();
+      },
+      child: Dialog(
+        child: Container(
         width: 500,
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.8,
@@ -40,7 +52,7 @@ class CameraControlModal extends ConsumerWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: c.closeCameraModal,
+                    onPressed: onClose, // Use provided callback
                   ),
                 ],
               ),
@@ -197,7 +209,7 @@ class CameraControlModal extends ConsumerWidget {
 
                   // Close button
                   TextButton(
-                    onPressed: c.closeCameraModal,
+                    onPressed: onClose, // Use provided callback
                     child: const Text('Close'),
                   ),
                 ],
@@ -206,6 +218,7 @@ class CameraControlModal extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 
