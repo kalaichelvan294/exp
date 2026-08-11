@@ -144,6 +144,8 @@ class ProductEmbeddingRepository {
       throw StateError('Item images root folder does not exist.');
     }
     _log('Storage root exists: "$storageRoot".');
+    final fileIndex = await _buildFileIndex(root);
+    _log('Discovered ${fileIndex.length} file(s) under root (recursive scan).');
 
     final products = await _db.query(
       'SELECT * FROM products ORDER BY id',
@@ -157,10 +159,13 @@ class ProductEmbeddingRepository {
     for (final row in products) {
       final product = Product.fromJson(row);
       try {
-        final files = await _collectTrainingImages(root, product.sku);
+        final files = await _collectTrainingImages(root, product.sku, fileIndex);
         if (files == null) {
           productsSkipped++;
-          _log('SKIP sku="${product.sku}" id="${product.id}" reason=no_master_image_found');
+          _log(
+            'SKIP sku="${product.sku}" id="${product.id}" reason=no_master_image_found '
+            'expectedAnyOf=${_expectedTrainingNames(product.sku, const ["master"]).join(",")}',
+          );
           continue;
         }
         _log(
@@ -290,13 +295,26 @@ class ProductEmbeddingRepository {
     return best;
   }
 
-  Future<List<File>?> _collectTrainingImages(Directory root, String sku) async {
+  Future<List<File>?> _collectTrainingImages(
+    Directory root,
+    String sku,
+    Map<String, File> fileIndex,
+  ) async {
+    _log('Path generation for sku="$sku" root="${root.path}"');
+    _log(
+      'Expected master names: ${_expectedTrainingNames(sku, const ['master']).join(', ')}',
+    );
     final master = await _findExistingFile(
       root,
       sku,
       const ['master'],
+      fileIndex,
     );
-    if (master == null) return null;
+    if (master == null) {
+      _log('No master file resolved for sku="$sku".');
+      return null;
+    }
+    _log('Resolved master path for sku="$sku": "${master.path}"');
 
     final variants = <File>[master];
     for (final variant in const ['1', '2', '3', '4', '5']) {
@@ -304,9 +322,11 @@ class ProductEmbeddingRepository {
         root,
         sku,
         [variant],
+        fileIndex,
       );
       if (variantFile != null) {
         variants.add(variantFile);
+        _log('Resolved variant path for sku="$sku" variant="$variant": "${variantFile.path}"');
       }
     }
 
@@ -318,25 +338,59 @@ class ProductEmbeddingRepository {
     Directory root,
     String sku,
     List<String> variants,
+    Map<String, File> fileIndex,
   ) async {
     for (final variant in variants) {
       for (final extension in const ['jpg', 'jpeg', 'png']) {
-        final candidate = File(
-          _joinPath(
-            root.path,
-            ItemImagePath.trainingFileNameForSku(
-              sku,
-              variant,
-              extension: extension,
-            ),
-          ),
+        final fileName = ItemImagePath.trainingFileNameForSku(
+          sku,
+          variant,
+          extension: extension,
+        );
+        final candidate = File(_joinPath(root.path, fileName));
+        _log(
+          'Trying candidate for sku="$sku" variant="$variant": "${candidate.path}"',
         );
         if (await candidate.exists()) {
+          _log('Matched direct path: "${candidate.path}"');
           return candidate;
+        }
+        final indexed = fileIndex[fileName.toLowerCase()];
+        if (indexed != null) {
+          _log('Matched indexed path (recursive/case-insensitive): "${indexed.path}"');
+          return indexed;
         }
       }
     }
     return null;
+  }
+
+  List<String> _expectedTrainingNames(String sku, List<String> variants) {
+    final names = <String>[];
+    for (final variant in variants) {
+      for (final extension in const ['jpg', 'jpeg', 'png']) {
+        names.add(
+          ItemImagePath.trainingFileNameForSku(
+            sku,
+            variant,
+            extension: extension,
+          ),
+        );
+      }
+    }
+    return names;
+  }
+
+  Future<Map<String, File>> _buildFileIndex(Directory root) async {
+    final index = <String, File>{};
+    await for (final entity in root.list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final name = entity.path.split(RegExp(r'[\\\/]')).last.trim();
+      if (name.isEmpty) continue;
+      final lower = name.toLowerCase();
+      index.putIfAbsent(lower, () => entity);
+    }
+    return index;
   }
 
   Future<void> _deleteTrainingVariants(Directory root, String sku) async {
